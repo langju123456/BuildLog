@@ -53,6 +53,8 @@ def create_run_record(
     iteration: Iteration,
     settings: Settings,
     prompts: dict[str, PromptFile],
+    *,
+    started_at: datetime | None = None,
 ) -> RunRecord:
     """Create run metadata with explicit prompt-version lineage."""
     prompt_ids = {name: _prompt_record(prompt).id for name, prompt in prompts.items()}
@@ -64,6 +66,7 @@ def create_run_record(
         writer_prompt_version_id=prompt_ids["writer"],
         evaluator_prompt_version_id=prompt_ids["evaluator"],
         reviser_prompt_version_id=prompt_ids["reviser"],
+        started_at=started_at or datetime.now(UTC),
     )
 
 

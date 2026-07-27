@@ -2,48 +2,67 @@
 
 ## Objective
 
-Establish the BuildLog v0.1 Example Showcase and make the boundaries among raw
-runs, reviewed evaluation assets, and public examples explicit.
+Establish the BuildLog v0.1 Agent Observability Baseline.
+
+Make every BuildLog run explainable and reproducible without changing any
+pipeline behavior.
 
 ## Current Task
 
-- [x] Confirm the selected architecture v1 and v2 raw outputs exist locally
-- [x] Preserve the generated post content in a public architecture showcase
-- [x] Link the source iteration, v1 output, v2 output, and quality baseline
-- [x] Define the future reviewed `eval_corpus/` boundary
-- [x] Document raw runs as internal evaluation source assets
-- [x] Treat `docs/output_quality_baseline.md` as the current scoring protocol
-- [x] Make example outputs discoverable from the root README
-- [x] Document the three asset layers without changing persistence behavior
-- [x] Verify all documentation links and copied output hashes
-- [x] Run the complete deterministic test suite
-- [x] Confirm raw runs and local artifacts remain outside Git
+- [x] Define validated Run, Step, LLM-call, Error, and Artifact Dependency
+  observation schemas
+- [x] Record all ten fixed steps exactly once, including explicit skipped states
+- [x] Record step duration and attempt count without adding retry behavior
+- [x] Record model configuration, prompt hashes, provider token usage, finish
+  reason, and LLM-call duration
+- [x] Preserve unavailable token counts as `null` with an availability reason
+- [x] Record structured revision triggers and whether revision changed the draft
+- [x] Mark revision improvement as `not_measured` without a post-revision
+  evaluation
+- [x] Record producing steps and direct artifact dependencies
+- [x] Classify and sanitize observed errors without swallowing business failures
+- [x] Add `run_metadata.json`, `timeline.json`, and `events.jsonl`
+- [x] Add SQLite query projections for observations without changing existing
+  business-table meaning
+- [x] Keep observability failure isolated from generation behavior
+- [x] Add deterministic tests for the observability contract
+- [x] Run one complete local Qwen3 workflow and inspect its observation outputs
+- [x] Complete the final regression, scope, prompt-hash, and artifact-contract
+  review
 
 ## Definition of Done
 
-- [x] `examples/outputs/architecture/` contains README, v1, and v2 Markdown
-- [x] Public v1 and v2 files preserve the selected generated text
-- [x] `eval_corpus/README.md` requires deliberate human review and sanitization
-- [x] The root README links input, outputs, and evaluation baseline
-- [x] PROJECT documents the asset layers without redesigning the architecture
-- [x] `runs/`, databases, caches, virtual environments, and local artifacts
-  remain untracked
-- [x] Documentation links resolve
-- [x] Existing deterministic tests pass
+- [x] Pipeline, observability, and reproducibility statuses are independent
+- [x] Every fixed step has status, timestamps, duration, attempts, and skip reason
+- [x] The run identifies its slowest step and highest-token step when measurable
+- [x] Every LLM call belongs to a step and records replay-relevant metadata
+- [x] Revision execution or skipping is explained by structured evidence
+- [x] Final artifact lineage points directly to Draft or Revised Draft
+- [x] Error records use the frozen category taxonomy and stable error codes
+- [x] Replay completeness is based on an explicit checklist and configuration
+  fingerprint
+- [x] Existing artifact filenames and pipeline behavior remain unchanged
+- [x] Filesystem payloads remain authoritative and SQLite remains a query
+  projection
+- [x] No prompt or model-response body is stored in SQLite telemetry
+- [x] Observability failure cannot cause a new LLM call or change business output
+- [x] A real local run produces inspectable metadata, timeline, events, and
+  SQLite observations
+- [x] All tests pass and `git diff --check` reports no errors
 
 ## Out of Scope
 
-- Copying complete raw run directories into Git
-- Automatically promoting raw runs into the evaluation corpus
-- Creating fake or bulk evaluation samples
-- Few-shot selection, retrieval, or dataset tooling
-- Prompt, evaluator, writer, planner, or reviser changes
-- Revision-threshold changes
-- Model or token-setting changes
-- New infrastructure or frameworks
-- New database tables
+- Prompt, evaluator, writer, planner, or reviser behavior changes
+- Revision-threshold or revision-count changes
+- Retry-policy changes
+- Additional LLM calls or post-revision evaluation
+- Moving or renaming existing generated artifacts
+- Full prompt, response, or post-body storage in telemetry tables
+- Token estimation when the provider does not return usage
+- Byte-identical output guarantees at nonzero temperature
+- Dashboards, external tracing services, or OpenTelemetry
+- New business outputs beyond `linkedin_post`
 - API or UI
 - RAG
 - LinkedIn publishing
-- New pipeline stages
-- Unrelated architecture refactoring
+- Performance or output-quality optimization

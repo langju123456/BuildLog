@@ -18,12 +18,17 @@ from buildlog.domain import (
 from buildlog.sqlalchemy_repository import SQLAlchemyRunRepository
 
 EXPECTED_TABLES = {
+    "artifact_dependencies",
     "artifacts",
+    "error_observations",
     "evaluations",
     "iterations",
+    "llm_call_observations",
     "projects",
     "prompt_versions",
+    "run_observations",
     "runs",
+    "step_observations",
 }
 
 

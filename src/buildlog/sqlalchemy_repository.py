@@ -5,9 +5,9 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 
-from sqlalchemy import Engine, create_engine, event, select, update
+from sqlalchemy import create_engine, event, select, update
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from buildlog.domain import (
     ArtifactRecord,
@@ -18,6 +18,13 @@ from buildlog.domain import (
     RunRecord,
 )
 from buildlog.exceptions import PersistenceError
+from buildlog.observability_models import (
+    ArtifactDependency,
+    ErrorObservation,
+    LLMCallObservation,
+    RunObservation,
+    StepObservation,
+)
 from buildlog.persistence_models import (
     ArtifactTable,
     Base,
@@ -26,6 +33,9 @@ from buildlog.persistence_models import (
     ProjectTable,
     PromptVersionTable,
     RunTable,
+)
+from buildlog.sqlalchemy_observability_repository import (
+    SQLAlchemyObservabilityRepository,
 )
 
 
@@ -37,6 +47,7 @@ class SQLAlchemyRunRepository:
         if database_url.startswith("sqlite"):
             event.listen(self.engine, "connect", _enable_sqlite_foreign_keys)
         self._sessions = sessionmaker(self.engine, expire_on_commit=False)
+        self._observability = SQLAlchemyObservabilityRepository(self.engine)
 
     def initialize(self) -> None:
         """Create all v0.1 tables when they do not exist."""
@@ -219,6 +230,43 @@ class SQLAlchemyRunRepository:
                 return _evaluation_record(row) if row is not None else None
         except SQLAlchemyError as exc:
             raise PersistenceError(f"could not load evaluation: {exc}") from exc
+
+    def save_observability_bundle(
+        self,
+        run: RunObservation,
+        steps: list[StepObservation],
+        llm_calls: list[LLMCallObservation],
+        errors: list[ErrorObservation],
+        artifact_dependencies: list[ArtifactDependency],
+    ) -> None:
+        """Persist one atomic query projection of observability metadata."""
+        self._observability.save_observability_bundle(
+            run,
+            steps,
+            llm_calls,
+            errors,
+            artifact_dependencies,
+        )
+
+    def get_run_observation(self, run_id: str) -> RunObservation | None:
+        """Return one persisted run observation."""
+        return self._observability.get_run_observation(run_id)
+
+    def list_step_observations(self, run_id: str) -> list[StepObservation]:
+        """Return fixed step observations in persisted order."""
+        return self._observability.list_step_observations(run_id)
+
+    def list_llm_call_observations(self, run_id: str) -> list[LLMCallObservation]:
+        """Return LLM calls in call-id order."""
+        return self._observability.list_llm_call_observations(run_id)
+
+    def list_error_observations(self, run_id: str) -> list[ErrorObservation]:
+        """Return structured errors in occurrence order."""
+        return self._observability.list_error_observations(run_id)
+
+    def list_artifact_dependencies(self, run_id: str) -> list[ArtifactDependency]:
+        """Return direct artifact dependencies in id order."""
+        return self._observability.list_artifact_dependencies(run_id)
 
     def _add(self, row: object, label: str) -> None:
         try:

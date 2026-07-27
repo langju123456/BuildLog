@@ -13,6 +13,7 @@ from buildlog.domain import (
     PromptVersionRecord,
     RunRecord,
 )
+from buildlog.observability_repository import ObservabilityRepository
 
 
 class RunRepository(Protocol):
@@ -58,3 +59,7 @@ class RunRepository(Protocol):
 
     def get_evaluation(self, run_id: str) -> EvaluationRecord | None:
         """Return the evaluation related to one run."""
+
+
+class BuildLogRepository(RunRepository, ObservabilityRepository, Protocol):
+    """Combined repository capabilities required by the local pipeline."""

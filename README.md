@@ -50,7 +50,8 @@ The system does not invent projects, results, metrics, or business impact.
 - LinkedIn draft generation
 - Draft evaluation
 - One constrained revision
-- Run traces
+- Run, step, LLM-call, error, and artifact-lineage observability
+- Replay metadata for input, code, prompts, model, and generation settings
 - SQLite metadata and run relationships
 - Markdown output
 
@@ -118,12 +119,48 @@ Each execution writes readable artifacts under `runs/` and structured metadata
 to `buildlog.db` by default. `BUILDLOG_DATABASE_URL` can point to another local
 SQLite file.
 
+Set `BUILDLOG_MODEL_DIGEST` to the immutable digest reported by the local model
+runtime when it is available. A missing digest is recorded honestly and makes
+the replay manifest partial; BuildLog never guesses one.
+
+## Agent observability
+
+Every run retains the existing content artifacts and adds three observation
+views:
+
+- `run_metadata.json` summarizes configuration, status, token availability,
+  revision evidence, Git state, and replay requirements.
+- `timeline.json` shows each fixed pipeline step, its status and duration, the
+  slowest step, and the highest-token step when provider usage is available.
+- `events.jsonl` preserves ordered run, step, LLM-call, artifact, revision, and
+  error events for detailed audit.
+
+The ten fixed steps are `validation`, `preprocessing`, `prompt_loading`,
+`planner`, `writer`, `evaluator`, `revision_decision`, `reviser`,
+`finalization`, and `persistence`. A step that does not run is recorded once as
+`skipped`, including its reason.
+
+BuildLog reports three independent outcomes:
+
+- `pipeline_status`: whether content generation completed or failed.
+- `observability_status`: whether telemetry capture is complete, partial, or
+  failed.
+- `reproducibility_status`: whether the saved evidence is sufficient to replay
+  the same input, code, prompts, model, and configuration.
+
+Replayability does not promise byte-identical model output at nonzero
+temperature. Missing token usage remains `null` with an availability reason;
+it is never estimated. Observability failures do not trigger another LLM call,
+change the revision decision, or remove a successfully generated final draft.
+
 ## Persistence boundary
 
 The filesystem is the inspectable source for generated JSON and Markdown.
 SQLite indexes projects, iterations, runs, prompt versions, evaluations, and
-artifact paths and hashes. It does not provide authentication, an API, a UI, or
-publishing.
+artifact paths and hashes. It also provides query projections for run, step,
+LLM-call, error, and direct artifact-dependency observations. SQLite does not
+store full prompts, post bodies, or model responses and does not provide
+authentication, an API, a UI, or publishing.
 
 ## Artifact layers
 
@@ -143,9 +180,9 @@ Read [`PROJECT.md`](PROJECT.md) for the complete product definition, architectur
 
 ## Status
 
-BuildLog v0.1 has a frozen local architecture, an output-quality baseline, and
-a five-case generalization baseline. Generated posts still require human review
-before publishing.
+BuildLog v0.1 has a frozen local architecture, output-quality and
+generalization baselines, a public example showcase, and explainable local run
+observability. Generated posts still require human review before publishing.
 
 ```text
 Real development evidence in.

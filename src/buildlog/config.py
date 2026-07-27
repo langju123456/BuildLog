@@ -13,6 +13,7 @@ class Settings:
     """Runtime settings for the BuildLog pipeline."""
 
     model: str
+    model_digest: str | None
     api_base: str | None
     temperature: float
     max_tokens: int
@@ -35,6 +36,7 @@ def load_settings(project_root: Path | None = None) -> Settings:
     root = project_root or Path.cwd()
     return Settings(
         model=os.getenv("BUILDLOG_MODEL", "ollama_chat/qwen3"),
+        model_digest=os.getenv("BUILDLOG_MODEL_DIGEST") or None,
         api_base=os.getenv("BUILDLOG_API_BASE", "http://127.0.0.1:11434"),
         temperature=float(os.getenv("BUILDLOG_TEMPERATURE", "0.4")),
         max_tokens=int(os.getenv("BUILDLOG_MAX_TOKENS", "2200")),

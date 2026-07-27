@@ -670,11 +670,69 @@ Not required for v0.1:
 
 ---
 
-## 13. Trace and observability
+## 13. Agent observability
 
-Every run must create a unique directory.
+### 13.1 Objective and invariant
 
-Example:
+The v0.1 observability objective is:
+
+> Make every BuildLog run explainable and reproducible without changing any
+> pipeline behavior.
+
+Observability is a cross-cutting record of existing behavior. It must not:
+
+- change prompt content
+- change model settings
+- add or reorder LLM calls
+- add retries
+- change threshold decisions
+- add post-revision evaluation
+- move or rename existing content artifacts
+- turn a successful generation into a failure
+
+An observability failure may mark the observation as partial, but it must not
+remove a final draft, trigger another LLM call, or alter the revision decision.
+Business exceptions still propagate according to the original pipeline
+behavior; observability records them but does not swallow them.
+
+### 13.2 Replay definition
+
+Reproducible means BuildLog retains enough evidence to replay the same input,
+code, prompt files, model, and generation configuration.
+
+It does not mean a non-deterministic model must produce byte-identical text.
+At `temperature=0.4`, identical replay conditions may still produce different
+tokens.
+
+The replay checklist contains:
+
+- input artifact hash
+- normalized input hash
+- Git commit
+- Git branch and working-tree state
+- prompt file hashes
+- rendered prompt hashes
+- provider
+- model
+- model digest
+- temperature
+- maximum output tokens
+- canonical configuration fingerprint
+
+If any required value is unavailable, `reproducibility_status` is `partial`.
+BuildLog records the missing fields and never fabricates them. A dirty working
+tree is partial unless its exact code state is otherwise preserved.
+
+The configuration fingerprint is a SHA-256 hash of canonical JSON containing
+only generation-affecting configuration: provider, model, model digest,
+temperature, maximum output tokens, prompt file hashes, output type, and the
+active revision thresholds. It excludes timestamps, durations, and generated
+content.
+
+### 13.3 Run artifact contract
+
+Every run creates a unique directory while preserving the established artifact
+filenames:
 
 ```text
 runs/
@@ -686,80 +744,199 @@ runs/
     ├── 04_evaluation.json
     ├── 05_revised_draft.md
     ├── 06_final.md
-    └── run_metadata.json
+    ├── run_metadata.json
+    ├── timeline.json
+    └── events.jsonl
 ```
 
-### `run_metadata.json`
+`05_revised_draft.md` exists only when revision runs, matching the previous
+artifact contract.
 
-Should contain:
+The three observation files serve different readers:
+
+- `run_metadata.json` is the run summary, configuration manifest,
+  reproducibility checklist, token summary, and revision evidence.
+- `timeline.json` is the human-readable fixed-step status and timing view.
+- `events.jsonl` is the ordered detailed audit stream for run, step, LLM-call,
+  artifact, revision, and error events.
+
+JSONL is the detailed event record. SQLite is the query projection. JSON and
+Markdown artifact files remain the source of truth for payload content.
+
+### 13.4 Independent statuses
+
+One status cannot express all three concerns. Every run records:
+
+```text
+pipeline_status: completed | failed
+observability_status: complete | partial | failed
+reproducibility_status: complete | partial
+```
+
+Examples:
+
+- completed pipeline + partial observability: the draft exists, but some
+  telemetry could not be saved
+- failed pipeline + complete observability: the business run failed and the
+  failure path was fully captured
+- complete observability + partial reproducibility: execution is fully
+  explained, but the model digest or clean code state is missing
+
+### 13.5 Fixed steps
+
+Every run contains each of these steps exactly once and in this order:
+
+1. `validation`
+2. `preprocessing`
+3. `prompt_loading`
+4. `planner`
+5. `writer`
+6. `evaluator`
+7. `revision_decision`
+8. `reviser`
+9. `finalization`
+10. `persistence`
+
+Each step records status, start, end, duration, attempt count, and skip reason.
+An unexecuted conditional step is `skipped`; a step not reached after a failure
+is `skipped` with `skip_reason=upstream_failure`.
+
+Attempt counts have one meaning:
+
+- not executed: `0`
+- executed once: `1`
+- executed twice: `2`
+
+This baseline adds no retry behavior. Persistence timing aggregates the
+existing persistence operations and identifies its timing mode explicitly.
+
+### 13.6 LLM-call observations
+
+Each LLM call belongs to one fixed step and records:
+
+- provider, model, and optional immutable model digest
+- temperature and maximum output tokens
+- prompt file hash and rendered prompt hash
+- start, end, and duration
+- attempt number
+- provider finish reason when available
+- provider prompt, completion, and total token counts when available
+- status and structured error reference
+
+Full prompt text and full model responses are not stored in SQLite telemetry.
+
+When token usage is unavailable, all missing counts remain `null` and the call
+records:
+
+```text
+token_usage_status: unavailable
+token_usage_source: provider_not_returned
+```
+
+Token counts must never be estimated from character or word counts.
+
+### 13.7 Revision evidence
+
+The existing deterministic revision decision is represented as structured
+evidence:
 
 ```json
 {
-  "run_id": "2026-07-27T19-30-12_local-agent-001",
-  "iteration_id": "local-agent-001",
-  "model": "ollama_chat/qwen3",
-  "prompt_versions": {
-    "planner": "v1",
-    "writer": "v1",
-    "evaluator": "v1",
-    "reviser": "v1"
-  },
-  "revision_performed": true,
-  "status": "completed"
+  "revision_required": true,
+  "decision_rule_version": "v1",
+  "triggered_by": [
+    {
+      "type": "score_threshold",
+      "metric": "specificity",
+      "actual": 6,
+      "operator": "<",
+      "threshold": 7
+    }
+  ]
 }
 ```
 
-### Logging requirements
+Hard-failure codes are recorded only when the existing evaluator provides
+them. The observability layer does not invent unavailable reasons.
 
-Logs should record:
+BuildLog records whether revision executed and whether the revised text hash
+differs from the draft hash. Since v0.1 does not evaluate the revised draft
+again, an executed revision records:
 
-- pipeline start
-- validation success or failure
-- each component start and completion
-- model-call failure
-- JSON parsing failure
-- evaluation result
-- revision decision
-- final output path
+```text
+revision_improvement_status: not_measured
+```
 
-Do not log secrets or full environment variables.
+Changed does not mean improved.
 
-### Hybrid persistence
+### 13.8 Artifact lineage
 
-BuildLog v0.1 is not a disposable file-only script. It uses two persistence
-mechanisms with separate responsibilities:
+Each artifact records its producing step and direct source artifacts.
+`source_artifact_ids` means direct dependencies, not every transitive ancestor.
 
-- the filesystem stores readable JSON and Markdown artifacts under `runs/`
-- SQLite stores structured metadata, relationships, statuses, scores, paths,
-  and SHA-256 content hashes
+The final artifact has one direct source:
 
-Required SQLite tables:
+```text
+no revision: 03_draft.md -> 06_final.md
+revision:    05_revised_draft.md -> 06_final.md
+```
 
-1. `projects`: `id`, `name`, `description`, `created_at`, `updated_at`
-2. `iterations`: `id`, `project_id`, `title`, `goal`, `context`, `problem`,
-   `audience`, `raw_input_json`, `created_at`
-3. `runs`: `id`, `iteration_id`, `model`, `status`, `revision_performed`,
-   `started_at`, `completed_at`, `error_message`, and four prompt-version
-   foreign keys
-4. `artifacts`: `id`, `run_id`, `artifact_type`, `file_path`, `content_hash`,
-   `created_at`
-5. `evaluations`: `id`, `run_id`, five rubric scores, `feedback_json`,
-   `created_at`
-6. `prompt_versions`: `id`, `prompt_name`, `version`, `file_path`,
-   `content_hash`, `created_at`
+The complete upstream chain is recoverable by recursively following direct
+dependencies.
 
-Relationships:
+### 13.9 Error taxonomy
 
-- one project has many iterations
-- one iteration has many runs
-- one run has many artifacts and at most one evaluation
-- each run records the exact planner, writer, evaluator, and reviser prompt
-  versions available for that execution
+Observed errors use a stable `error_category` and a more specific
+`error_code`. The frozen categories are:
 
-Business logic must not depend directly on SQLAlchemy persistence models.
-Domain records and a minimal repository protocol form the boundary between the
-pipeline and persistence. The SQLAlchemy-backed repository is the only v0.1
-implementation.
+- `input_validation`
+- `prompt_loading`
+- `transport`
+- `timeout`
+- `empty_response`
+- `json_parse`
+- `schema_validation`
+- `artifact_write`
+- `persistence`
+- `unknown`
+
+Each error also records step name, LLM-call ID when relevant, attempt,
+occurrence time, terminal status, exception type, and a sanitized message.
+Secrets and full environment values must not be recorded.
+
+### 13.10 Hybrid persistence
+
+BuildLog uses two persistence mechanisms with separate responsibilities:
+
+- filesystem artifacts store inspectable payloads under `runs/`
+- SQLite stores business metadata and queryable observability projections
+
+Existing business tables retain their meaning:
+
+1. `projects`
+2. `iterations`
+3. `runs`
+4. `artifacts`
+5. `evaluations`
+6. `prompt_versions`
+
+The observability baseline adds:
+
+1. `run_observations`
+2. `step_observations`
+3. `llm_call_observations`
+4. `error_observations`
+5. `artifact_dependencies`
+
+SQLite does not store full prompts, post bodies, or model responses. It is not
+required to be transactionally identical to the JSONL stream. If a projection
+write fails, filesystem output continues and `observability_status` becomes
+`partial`.
+
+Business logic does not depend directly on SQLAlchemy persistence models.
+Domain records and repository protocols form the boundary between the pipeline
+and persistence. The SQLAlchemy-backed repositories are the v0.1
+implementations.
 
 Creating tables on startup is acceptable for v0.1. Do not add Alembic, async
 database access, repository factories, or an additional service layer.
@@ -888,11 +1065,16 @@ BuildLog/
 │       ├── writer.py
 │       ├── evaluator.py
 │       ├── reviser.py
+│       ├── observability_models.py
+│       ├── observability_utils.py
+│       ├── observability_repository.py
+│       ├── observer.py
 │       ├── pipeline.py
 │       ├── trace.py
 │       ├── repository.py
 │       ├── run_persistence.py
 │       ├── persistence_models.py
+│       ├── sqlalchemy_observability_repository.py
 │       ├── sqlalchemy_repository.py
 │       └── exceptions.py
 ├── tests/
@@ -902,6 +1084,7 @@ BuildLog/
 │   ├── test_threshold_logic.py
 │   ├── test_repository.py
 │   ├── test_pipeline.py
+│   ├── test_observability.py
 │   ├── test_prompt_loader.py
 │   ├── test_trace.py
 │   └── fixtures/
@@ -984,6 +1167,29 @@ BuildLog/
 - contains revision decision logic
 - does not contain prompt text
 
+### `observability_models.py`
+
+- defines validated observation schemas and fixed status vocabularies
+- contains no filesystem, provider, or SQLAlchemy behavior
+
+### `observability_utils.py`
+
+- provides timing, sanitization, error classification, Git-state inspection,
+  and canonical hash helpers
+- contains no pipeline business decisions
+
+### `observer.py`
+
+- observes the existing Run, Step, LLM-call, Error, and Artifact lifecycles
+- writes summary, timeline, and ordered event views
+- builds revision evidence and replay completeness without changing behavior
+- isolates telemetry failures from generation
+
+### `observability_repository.py`
+
+- defines the minimal protocol for queryable observation projections
+- contains no SQLAlchemy imports
+
 ### `trace.py`
 
 - creates run directory
@@ -1020,8 +1226,13 @@ BuildLog/
 ### `sqlalchemy_repository.py`
 
 - creates the SQLite schema on startup
-- implements the repository protocol
+- implements the business repository protocol
 - stores run relationships, scores, paths, and hashes
+
+### `sqlalchemy_observability_repository.py`
+
+- implements the observability query projection
+- stores no full prompt, model-response, or post payload
 
 ### `exceptions.py`
 
@@ -1200,6 +1411,7 @@ Suggested `.env.example`:
 
 ```env
 BUILDLOG_MODEL=ollama_chat/qwen3
+BUILDLOG_MODEL_DIGEST=
 BUILDLOG_API_BASE=http://127.0.0.1:11434
 BUILDLOG_TEMPERATURE=0.4
 BUILDLOG_MAX_TOKENS=2200
@@ -1229,8 +1441,17 @@ v0.1 is complete when:
 - [ ] Threshold logic is deterministic.
 - [ ] At most one revision occurs.
 - [ ] Every pipeline artifact is stored.
+- [ ] Every fixed step is represented exactly once in the timeline.
+- [ ] Every LLM call is associated with a fixed step.
+- [ ] Missing provider token usage is stored as unavailable, never estimated.
+- [ ] Revision triggers and direct final-artifact lineage are inspectable.
+- [ ] Revision improvement is marked `not_measured` without post-evaluation.
+- [ ] Pipeline, observability, and reproducibility statuses are independent.
+- [ ] Replay completeness is based on an explicit requirement checklist.
+- [ ] Observability failures do not alter pipeline output or model-call count.
 - [ ] SQLite tables are created on startup.
 - [ ] Project, iteration, run, artifact, evaluation, and prompt metadata are persisted.
+- [ ] Run, step, LLM-call, error, and artifact-dependency projections are persisted.
 - [ ] Artifact and prompt paths and SHA-256 hashes are persisted.
 - [ ] Domain and business logic do not import SQLAlchemy models.
 - [ ] The final draft is written to Markdown.
