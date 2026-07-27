@@ -14,6 +14,35 @@ The input describes the decision to evolve BuildLog from file-only traces to a
 hybrid persistence model with readable filesystem artifacts and queryable
 SQLite metadata.
 
+## Baseline Role
+
+This document is BuildLog's current quality baseline and evaluation protocol,
+not only a historical experiment report. Future changes to prompts, models,
+writers, evaluators, revision behavior, or model settings should be compared
+against this baseline rather than accepted because an output feels better.
+
+The protocol combines technical accuracy, specificity, readability, reader
+value, evidence coverage, authenticity, unsupported-claim review,
+publishability, opening quality, and transferable-lesson quality.
+
+```text
+Hypothesis
+    ↓
+Controlled run
+    ↓
+Automated evaluation
+    ↓
+Human evaluation
+    ↓
+Baseline comparison
+    ↓
+Accept or reject
+```
+
+Raw runs are the internal source evidence for this process. Reviewed evaluation
+records may later be promoted to `eval_corpus/`, while only selected and
+sanitized outputs belong in the public showcase under `examples/outputs/`.
+
 ## Experiment Setup
 
 | Setting | v1 | v2 |

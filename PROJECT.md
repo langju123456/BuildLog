@@ -764,6 +764,38 @@ implementation.
 Creating tables on startup is acceptable for v0.1. Do not add Alembic, async
 database access, repository factories, or an additional service layer.
 
+### Artifact asset layers
+
+The persistence architecture and the repository's curated assets have
+different responsibilities:
+
+1. `runs/` contains complete raw execution traces. Raw runs are internal
+   evaluation source data, remain ignored by Git, and may contain failed
+   outputs, local paths, debugging context, or private evidence.
+2. `eval_corpus/` is reserved for deliberately reviewed and sanitized
+   evaluation records. Nothing is promoted from raw runs automatically.
+3. `examples/outputs/` contains selected public showcase outputs that are safe
+   and useful for GitHub visitors.
+4. `docs/output_quality_baseline.md` defines the current scoring baseline and
+   evaluation protocol used to accept or reject future quality changes.
+
+The intended promotion path is:
+
+```text
+Raw run
+    ↓
+Human review
+    ↓
+Evaluation baseline
+    ↓
+Selected public showcase
+    ↓
+Future reviewed evaluation or few-shot asset
+```
+
+This distinction does not add a pipeline stage or change filesystem and SQLite
+persistence behavior.
+
 ---
 
 ## 14. Technical stack
@@ -822,9 +854,16 @@ BuildLog/
 ├── pyproject.toml
 ├── .env.example
 ├── .gitignore
+├── eval_corpus/
+│   └── README.md
 ├── examples/
 │   ├── local_agent_iteration.json
-│   └── buildlog_architecture_iteration.json
+│   ├── buildlog_architecture_iteration.json
+│   └── outputs/
+│       └── architecture/
+│           ├── README.md
+│           ├── linkedin_v1.md
+│           └── linkedin_v2.md
 ├── prompts/
 │   ├── planner_v1.md
 │   ├── planner_v2.md
@@ -871,7 +910,8 @@ BuildLog/
 │   └── .gitkeep
 └── docs/
     ├── ideas.md
-    └── output_quality_baseline.md
+    ├── output_quality_baseline.md
+    └── generalization_baseline.md
 ```
 
 ---

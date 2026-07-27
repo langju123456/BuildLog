@@ -2,37 +2,44 @@
 
 ## Objective
 
-Establish the BuildLog v0.1 generalization baseline across five different types
-of real engineering iterations.
+Establish the BuildLog v0.1 Example Showcase and make the boundaries among raw
+runs, reviewed evaluation assets, and public examples explicit.
 
 ## Current Task
 
-- [x] Preserve the architecture case from the output-quality baseline
-- [x] Create a debugging case from the empty Qwen3 evaluator response
-- [x] Create an infrastructure case from the GitHub authentication workflow
-- [x] Create a local AI case from the Ollama model recovery workflow
-- [x] Create a developer workflow case from prompt and trace versioning
-- [x] Run all cases with v2 prompts and identical model settings
-- [x] Review every final post using the same human criteria
-- [x] Record publishability and the largest weakness for each case
-- [x] Identify only failure patterns that repeat across cases
-- [x] Document the results in `docs/generalization_baseline.md`
+- [x] Confirm the selected architecture v1 and v2 raw outputs exist locally
+- [x] Preserve the generated post content in a public architecture showcase
+- [x] Link the source iteration, v1 output, v2 output, and quality baseline
+- [x] Define the future reviewed `eval_corpus/` boundary
+- [x] Document raw runs as internal evaluation source assets
+- [x] Treat `docs/output_quality_baseline.md` as the current scoring protocol
+- [x] Make example outputs discoverable from the root README
+- [x] Document the three asset layers without changing persistence behavior
+- [x] Verify all documentation links and copied output hashes
+- [x] Run the complete deterministic test suite
+- [x] Confirm raw runs and local artifacts remain outside Git
 
 ## Definition of Done
 
-- [x] Five evidence-backed iteration inputs are present
-- [x] Every case has a completed local run with the same model settings
-- [x] Every final post has a human score and publishability decision
-- [x] The report separates repeated failures from case-specific failures
-- [x] No prompt file is changed during the iteration
-- [x] No architecture or product feature is added
+- [x] `examples/outputs/architecture/` contains README, v1, and v2 Markdown
+- [x] Public v1 and v2 files preserve the selected generated text
+- [x] `eval_corpus/README.md` requires deliberate human review and sanitization
+- [x] The root README links input, outputs, and evaluation baseline
+- [x] PROJECT documents the asset layers without redesigning the architecture
+- [x] `runs/`, databases, caches, virtual environments, and local artifacts
+  remain untracked
+- [x] Documentation links resolve
 - [x] Existing deterministic tests pass
 
 ## Out of Scope
 
-- Prompt v3
-- Prompt changes of any kind
-- Few-shot selection or retrieval
+- Copying complete raw run directories into Git
+- Automatically promoting raw runs into the evaluation corpus
+- Creating fake or bulk evaluation samples
+- Few-shot selection, retrieval, or dataset tooling
+- Prompt, evaluator, writer, planner, or reviser changes
+- Revision-threshold changes
+- Model or token-setting changes
 - New infrastructure or frameworks
 - New database tables
 - API or UI

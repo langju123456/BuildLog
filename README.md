@@ -64,6 +64,24 @@ The system does not invent projects, results, metrics, or business impact.
 - Long-term memory
 - Multi-platform content generation
 
+## Example Outputs
+
+The public architecture example is based on a real BuildLog development
+iteration. Both posts were generated locally with the same Qwen3:8b model; the
+prompt set changed from v1 to v2.
+
+Follow the complete public path:
+
+1. [Architecture iteration input](examples/buildlog_architecture_iteration.json)
+2. [Generated LinkedIn post v1](examples/outputs/architecture/linkedin_v1.md)
+3. [Generated LinkedIn post v2](examples/outputs/architecture/linkedin_v2.md)
+4. [Output quality baseline](docs/output_quality_baseline.md)
+
+The evaluation report compares automated scores with human editorial review.
+It found that v2 improved the result but still required human review before
+publishing. Complete raw traces remain local under `runs/` and are intentionally
+not published.
+
 ## Planned stack
 
 - Python
@@ -107,15 +125,29 @@ SQLite indexes projects, iterations, runs, prompt versions, evaluations, and
 artifact paths and hashes. It does not provide authentication, an API, a UI, or
 publishing.
 
+## Artifact layers
+
+- [`runs/`](runs/) contains complete raw execution traces. These are internal
+  evaluation source assets and remain ignored by Git.
+- [`eval_corpus/`](eval_corpus/) is reserved for reviewed and sanitized
+  evaluation records. No raw run is promoted automatically.
+- [`examples/outputs/`](examples/outputs/) contains selected public examples
+  that GitHub visitors can inspect without running BuildLog.
+- [`docs/output_quality_baseline.md`](docs/output_quality_baseline.md) is the
+  current scoring baseline for deciding whether a prompt, model, or evaluator
+  change is an improvement.
+
 ## Documentation
 
 Read [`PROJECT.md`](PROJECT.md) for the complete product definition, architecture, domain model, workflow, evaluation strategy, repository structure, and implementation instructions.
 
 ## Status
 
-BuildLog is currently in its first implementation iteration.
+BuildLog v0.1 has a frozen local architecture, an output-quality baseline, and
+a five-case generalization baseline. Generated posts still require human review
+before publishing.
 
 ```text
-One real iteration in.
-One evidence-grounded LinkedIn post out.
+Real development evidence in.
+Traceable, human-reviewed LinkedIn drafts out.
 ```
