@@ -15,7 +15,11 @@ def evaluate_draft(
     settings: Settings,
 ) -> Evaluation:
     """Evaluate a draft and return validated scores and feedback."""
-    prompt = load_prompt(settings.prompts_dir, "evaluator_v1.md").format(
+    prompt = load_prompt(
+        settings.prompts_dir,
+        "evaluator",
+        settings.prompt_version,
+    ).format(
         iteration_json=iteration.model_dump_json(indent=2),
         draft=draft,
     )

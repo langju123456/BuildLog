@@ -823,12 +823,17 @@ BuildLog/
 ├── .env.example
 ├── .gitignore
 ├── examples/
-│   └── local_agent_iteration.json
+│   ├── local_agent_iteration.json
+│   └── buildlog_architecture_iteration.json
 ├── prompts/
 │   ├── planner_v1.md
+│   ├── planner_v2.md
 │   ├── writer_v1.md
+│   ├── writer_v2.md
 │   ├── evaluator_v1.md
-│   └── reviser_v1.md
+│   ├── evaluator_v2.md
+│   ├── reviser_v1.md
+│   └── reviser_v2.md
 ├── src/
 │   └── buildlog/
 │       ├── __init__.py
@@ -858,13 +863,15 @@ BuildLog/
 │   ├── test_threshold_logic.py
 │   ├── test_repository.py
 │   ├── test_pipeline.py
+│   ├── test_prompt_loader.py
 │   ├── test_trace.py
 │   └── fixtures/
 │       └── valid_iteration.json
 ├── runs/
 │   └── .gitkeep
 └── docs/
-    └── ideas.md
+    ├── ideas.md
+    └── output_quality_baseline.md
 ```
 
 ---
@@ -1156,6 +1163,7 @@ BUILDLOG_MODEL=ollama_chat/qwen3
 BUILDLOG_API_BASE=http://127.0.0.1:11434
 BUILDLOG_TEMPERATURE=0.4
 BUILDLOG_MAX_TOKENS=2200
+BUILDLOG_PROMPT_VERSION=v1
 BUILDLOG_EVAL_THRESHOLD_ACCURACY=8
 BUILDLOG_EVAL_THRESHOLD_SPECIFICITY=7
 BUILDLOG_EVAL_THRESHOLD_READABILITY=7

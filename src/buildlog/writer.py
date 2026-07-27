@@ -15,7 +15,11 @@ def write_draft(
     settings: Settings,
 ) -> str:
     """Write the first LinkedIn draft as Markdown."""
-    prompt = load_prompt(settings.prompts_dir, "writer_v1.md").format(
+    prompt = load_prompt(
+        settings.prompts_dir,
+        "writer",
+        settings.prompt_version,
+    ).format(
         iteration_json=iteration.model_dump_json(indent=2),
         plan_json=plan.model_dump_json(indent=2),
     )

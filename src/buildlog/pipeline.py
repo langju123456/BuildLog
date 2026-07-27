@@ -55,7 +55,7 @@ def run_pipeline(
     iteration = load_iteration(input_path)
     LOGGER.info("validation success")
     normalized = normalize_iteration(iteration)
-    prompts = inspect_prompt_files(settings.prompts_dir)
+    prompts = inspect_prompt_files(settings.prompts_dir, settings.prompt_version)
     persist_run_inputs(repository, iteration, normalized, prompts)
 
     trace = create_run_trace(settings.runs_dir, iteration.id)

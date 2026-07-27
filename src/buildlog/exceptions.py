@@ -23,3 +23,7 @@ class TraceWriteError(BuildLogError):
 
 class PersistenceError(BuildLogError):
     """Raised when structured metadata cannot be persisted."""
+
+
+class PromptFileError(BuildLogError):
+    """Raised when a versioned prompt file cannot be loaded."""

@@ -16,7 +16,11 @@ def revise_draft(
     settings: Settings,
 ) -> str:
     """Revise a draft once using evaluator feedback."""
-    prompt = load_prompt(settings.prompts_dir, "reviser_v1.md").format(
+    prompt = load_prompt(
+        settings.prompts_dir,
+        "reviser",
+        settings.prompt_version,
+    ).format(
         iteration_json=iteration.model_dump_json(indent=2),
         draft=draft,
         evaluation_json=evaluation.model_dump_json(indent=2),

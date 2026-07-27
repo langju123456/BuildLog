@@ -21,6 +21,7 @@ class Settings:
     threshold_readability: int
     threshold_value: int
     threshold_evidence: int
+    prompt_version: str
     prompts_dir: Path
     runs_dir: Path
     database_url: str
@@ -42,6 +43,7 @@ def load_settings(project_root: Path | None = None) -> Settings:
         threshold_readability=int(os.getenv("BUILDLOG_EVAL_THRESHOLD_READABILITY", "7")),
         threshold_value=int(os.getenv("BUILDLOG_EVAL_THRESHOLD_VALUE", "7")),
         threshold_evidence=int(os.getenv("BUILDLOG_EVAL_THRESHOLD_EVIDENCE", "7")),
+        prompt_version=os.getenv("BUILDLOG_PROMPT_VERSION", "v1"),
         prompts_dir=root / "prompts",
         runs_dir=root / "runs",
         database_url=os.getenv("BUILDLOG_DATABASE_URL", f"sqlite:///{root / 'buildlog.db'}"),

@@ -93,6 +93,9 @@ BUILDLOG_MODEL=ollama_chat/qwen3:8b \
   .venv/bin/python -m buildlog.main examples/local_agent_iteration.json
 ```
 
+Set `BUILDLOG_PROMPT_VERSION=v2` to run the same pipeline with the versioned
+v2 prompt set while preserving v1 for comparison.
+
 Each execution writes readable artifacts under `runs/` and structured metadata
 to `buildlog.db` by default. `BUILDLOG_DATABASE_URL` can point to another local
 SQLite file.
