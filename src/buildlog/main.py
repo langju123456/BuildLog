@@ -1,0 +1,46 @@
+"""Command-line entry point for BuildLog."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+from buildlog.config import load_settings
+from buildlog.exceptions import BuildLogError
+from buildlog.pipeline import run_pipeline
+from buildlog.sqlalchemy_repository import SQLAlchemyRunRepository
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run BuildLog from the command line."""
+    parser = argparse.ArgumentParser(description="Generate a LinkedIn draft from one iteration JSON file.")
+    parser.add_argument("input_path", type=Path)
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    settings = load_settings(Path.cwd())
+
+    try:
+        repository = SQLAlchemyRunRepository(settings.database_url)
+        repository.initialize()
+        result = run_pipeline(args.input_path, settings, repository)
+    except BuildLogError as exc:
+        print(f"BuildLog failed: {exc}", file=sys.stderr)
+        return 1
+
+    print("BuildLog completed.\n")
+    print("Run:")
+    print(result.run_dir)
+    print("\nFinal draft:")
+    print(result.final_path)
+    print("\nEvaluation:")
+    for name, score in result.evaluation_scores.items():
+        print(f"{name}: {score}")
+    print(f"\nRevision performed: {'yes' if result.revision_performed else 'no'}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
