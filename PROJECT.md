@@ -10,9 +10,12 @@
 
 **Current version:** v0.1
 
-**Project type:** AI-assisted developer tool
+**Project type:** AI engineering communication engine
 
-**Primary output:** LinkedIn post draft
+**Current v0.1 output:** LinkedIn post draft
+
+**Long-term product category:** Engineering communication and knowledge
+platform
 
 **Primary user:** A developer who wants to convert real development work into accurate, reusable technical content
 
@@ -36,7 +39,12 @@ Most of this disappears after the code works.
 
 Git records what changed, but it rarely preserves why the change mattered, what alternatives were considered, what failed, or what the developer learned.
 
-BuildLog captures one real development iteration and transforms it into structured, evidence-grounded technical content.
+BuildLog captures one real development iteration and transforms it into structured, evidence-grounded technical communication.
+
+BuildLog is not primarily a LinkedIn generator. LinkedIn is the first v0.1
+output format. The broader product is an AI engineering communication engine
+that transforms engineering evidence into reviewable, traceable, and reusable
+technical artifacts.
 
 The long-term goal is not content generation for its own sake.
 
@@ -226,6 +234,64 @@ The system generates a draft.
 It does not decide whether the post is true, safe to publish, confidential, or representative of the user.
 
 The human remains responsible for final approval.
+
+### 6.7 Evolution principle
+
+Every BuildLog baseline should create value in three dimensions:
+
+1. Product capability: BuildLog becomes more useful for real engineering
+   communication.
+2. Engineering capability: the implementation proves a concrete AI Engineer
+   skill.
+3. Engineering knowledge: the iteration preserves reusable decisions,
+   trade-offs, failures, and lessons.
+
+A future baseline should not exist only because a technology is popular. It
+must connect a real product improvement to a demonstrable engineering
+capability and a reusable knowledge artifact.
+
+### 6.8 Capability baselines
+
+BuildLog evolves through capability baselines rather than disconnected feature
+additions. Version numbers describe product releases. Baseline names describe
+the capability being established.
+
+Completed or current baselines:
+
+- Architecture Baseline
+- Output Quality Baseline
+- Generalization Baseline
+- Example Showcase
+- Agent Observability Baseline
+
+Planned capability baselines:
+
+- Portfolio Baseline
+- Tool Calling Baseline
+- Evidence Collection Baseline
+- Embedding Baseline
+- Retrieval Baseline
+- Engineering Memory Baseline
+- Multimodal Communication Baseline
+- Workflow Automation Baseline
+- Publishing Baseline
+
+Each planned baseline is out of scope for v0.1 unless explicitly moved into
+the current task file.
+
+### 6.9 Product, portfolio, and learning dimensions
+
+BuildLog has three strategic dimensions:
+
+- Product: solve the real problem of turning engineering work into high-quality
+  communication.
+- Portfolio: demonstrate AI Engineer capabilities through working software,
+  tests, documentation, evaluation, and observability.
+- Learning: preserve engineering decisions and failure modes as reusable
+  knowledge for future coaching, review, and skill development.
+
+When choosing the next iteration, prefer work that strengthens all three
+dimensions without expanding the current version's frozen scope.
 
 ---
 

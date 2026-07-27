@@ -1,7 +1,13 @@
 # BuildLog
 
-**BuildLog transforms real software development work into evidence-grounded
-engineering communication.**
+[![Version](https://img.shields.io/badge/version-v0.1-2563eb)](PROJECT.md)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-25%20passed-2ea44f)](tests)
+[![LLM](https://img.shields.io/badge/LLM-local%20via%20Ollama-black?logo=ollama&logoColor=white)](https://ollama.com/)
+
+**BuildLog is an AI engineering communication engine that transforms real
+software development work into evidence-grounded, reviewable, and traceable
+technical content.**
 
 Evidence in. Reviewable engineering artifacts out.
 
@@ -16,20 +22,42 @@ what changed, but rarely captures why it mattered or how the engineer reasoned
 through it. Starting from a blank writing prompt usually produces a polished
 story with weak grounding.
 
-## What BuildLog Does
+## 🧩 Product Capabilities
 
-BuildLog is an evidence-to-artifact AI engineering workflow.
+BuildLog is an evidence-to-artifact AI engineering workflow. In v0.1, it
+proves this workflow with one output type: a human-reviewed LinkedIn technical
+post draft.
 
-It takes one structured record of real development work, identifies the
-strongest engineering story, creates a draft, evaluates it against the supplied
-evidence, and performs at most one constrained revision. Every important
-intermediate result remains available for inspection.
+Its current business capabilities are:
 
-BuildLog v0.1 deliberately has one narrow output: a human-reviewed LinkedIn
-post draft. The broader product idea is engineering communication; the current
-implementation proves that workflow with one output type.
+- **Engineering story extraction:** turns one real development iteration into
+  a clear account of the problem, decisions, trade-offs, result, and lesson.
+- **Engineering content generation:** converts that story into a professional,
+  evidence-grounded LinkedIn technical post draft.
+- **Automated content review:** evaluates the draft for accuracy, specificity,
+  readability, reader value, evidence coverage, and unsupported claims.
+- **Controlled revision:** performs at most one constrained revision when the
+  deterministic threshold rule requires it.
+- **Transparent generation:** stores the input, plan, draft, evaluation,
+  optional revision, and final Markdown for inspection.
+- **Production observability:** records step timing, LLM calls, token usage
+  when available, errors, revision evidence, artifact lineage, prompt hashes,
+  model configuration, and replay conditions.
+- **Replayable engineering workflow:** preserves enough metadata to rerun the
+  same engineering iteration under the same prompts, model configuration, and
+  code state as far as practical.
 
-## Why Trust It
+The current product is not a general content generator. It follows this path:
+
+```text
+Engineering evidence
+    ↓
+Engineering narrative
+    ↓
+Engineering communication
+```
+
+## 🛡️ Why Trust It
 
 BuildLog is designed around four controls.
 
@@ -58,7 +86,7 @@ BuildLog produces a draft, not a publishing decision. The user remains
 responsible for factual accuracy, confidentiality, tone, and final approval.
 There is no automatic LinkedIn publishing.
 
-## How It Works
+## ⚙️ How It Works
 
 ```mermaid
 flowchart LR
@@ -115,6 +143,29 @@ Not included:
 - Resume, ADR, weekly-report, or PR-description generation
 - A guarantee that generated text is publishable without human editing
 
+## 🤖 Skills Demonstrated
+
+BuildLog is also designed as an AI Engineer portfolio project. Each baseline
+must improve the product while proving a concrete engineering capability.
+
+| AI Engineering capability | Current status in BuildLog |
+|---|---|
+| Prompt engineering | Demonstrated through versioned planner, writer, evaluator, and reviser prompts |
+| Structured outputs | Demonstrated through validated Pydantic schemas for model outputs |
+| Local LLM integration | Demonstrated through Ollama and local Qwen3 runs |
+| Agentic workflow design | Demonstrated through a bounded Planner, Writer, Evaluator, and Reviser pipeline |
+| AI evaluation | Demonstrated through automated scoring, human-style review, and cross-case baselines |
+| Observability | Demonstrated through run metadata, timeline, events, LLM-call records, and artifact lineage |
+| Reproducibility | Demonstrated through prompt hashes, artifact hashes, model config, Git state, and replay metadata |
+| Backend engineering | Demonstrated through Python, Pydantic, SQLAlchemy, SQLite, repository boundaries, CLI, and tests |
+| Product thinking | Demonstrated through explicit v0.1 scope, non-goals, evaluation baselines, and public showcase assets |
+| Tool calling | Planned |
+| Evidence collection | Planned |
+| Embeddings and vector search | Planned |
+| Retrieval and memory | Planned |
+| Multimodal communication | Planned |
+| Workflow automation and publishing | Planned |
+
 ## See a Real Example
 
 The public architecture example follows a real BuildLog iteration from input
@@ -131,7 +182,7 @@ review remains necessary. A separate
 performance across architecture, debugging, infrastructure, local AI, and
 developer-workflow stories.
 
-## Run It Locally
+## 🚀 Run It Locally
 
 Requirements:
 
