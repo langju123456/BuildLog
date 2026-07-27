@@ -2,32 +2,37 @@
 
 ## Objective
 
-Establish the BuildLog v0.1 output quality baseline using real development
-evidence.
+Establish the BuildLog v0.1 generalization baseline across five different types
+of real engineering iterations.
 
 ## Current Task
 
-- [x] Create a real BuildLog architecture iteration input
-- [x] Run the input with v1 prompts
-- [x] Inspect and critique every generated artifact
-- [x] Identify the three largest output weaknesses
-- [x] Create only the v2 prompts needed to address those weaknesses
-- [x] Run the same input with v2 prompts
-- [x] Compare scores, claims, readability, hashes, and final post quality
-- [x] Document the comparison in `docs/output_quality_baseline.md`
+- [x] Preserve the architecture case from the output-quality baseline
+- [x] Create a debugging case from the empty Qwen3 evaluator response
+- [x] Create an infrastructure case from the GitHub authentication workflow
+- [x] Create a local AI case from the Ollama model recovery workflow
+- [x] Create a developer workflow case from prompt and trace versioning
+- [x] Run all cases with v2 prompts and identical model settings
+- [x] Review every final post using the same human criteria
+- [x] Record publishability and the largest weakness for each case
+- [x] Identify only failure patterns that repeat across cases
+- [x] Document the results in `docs/generalization_baseline.md`
 
 ## Definition of Done
 
-- [x] The same validated input runs with v1 and v2 prompts
-- [x] Both run directories preserve complete filesystem traces
-- [x] SQLite records exact prompt versions and hashes for both runs
-- [x] The final posts receive a human-style critique
-- [x] Prompt changes map directly to observed weaknesses
+- [x] Five evidence-backed iteration inputs are present
+- [x] Every case has a completed local run with the same model settings
+- [x] Every final post has a human score and publishability decision
+- [x] The report separates repeated failures from case-specific failures
+- [x] No prompt file is changed during the iteration
+- [x] No architecture or product feature is added
 - [x] Existing deterministic tests pass
-- [x] Remaining weaknesses and the next quality iteration are documented
 
 ## Out of Scope
 
+- Prompt v3
+- Prompt changes of any kind
+- Few-shot selection or retrieval
 - New infrastructure or frameworks
 - New database tables
 - API or UI
