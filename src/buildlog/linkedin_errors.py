@@ -80,12 +80,17 @@ class DuplicatePublicationBlockedError(LinkedInError):
 class IndeterminatePublicationBlockedError(LinkedInError):
     """A matching unresolved publication may already exist."""
 
-    def __init__(self, receipt_id: str, created_at: datetime) -> None:
+    def __init__(
+        self,
+        receipt_id: str,
+        created_at: datetime,
+        platform_name: str = "LinkedIn",
+    ) -> None:
         self.receipt_id = receipt_id
         self.created_at = created_at
         super().__init__(
             "an identical publication attempt has an indeterminate outcome "
-            f"({receipt_id}, {created_at.isoformat()}); inspect LinkedIn and the "
+            f"({receipt_id}, {created_at.isoformat()}); inspect {platform_name} and the "
             "receipt before using --allow-duplicate"
         )
 

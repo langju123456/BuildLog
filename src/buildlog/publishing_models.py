@@ -11,15 +11,16 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from buildlog.terminal_safety import is_unsafe_terminal_character
 
-_EXTERNAL_POST_ID_PATTERN = re.compile(
-    r"^urn:li:(?:share|ugcPost):[0-9]+$"
-)
+_LINKEDIN_POST_ID_PATTERN = re.compile(r"^urn:li:(?:share|ugcPost):[0-9]+$")
+_LINKEDIN_AUTHOR_PATTERN = re.compile(r"^urn:li:person:[^:\s]+$")
+_X_POST_ID_PATTERN = re.compile(r"^[0-9]+$")
 
 
 class PublicationPlatform(StrEnum):
     """Supported publication destination."""
 
     LINKEDIN = "linkedin"
+    X = "x"
 
 
 class PublicationStatus(StrEnum):
@@ -38,11 +39,11 @@ class PublishRequest(BaseModel):
     artifact_id: str = Field(min_length=1)
     platform: PublicationPlatform
     account_reference: str = Field(min_length=1)
-    author_urn: str = Field(pattern=r"^urn:li:person:[^:\s]+$", repr=False)
+    author_urn: str = Field(min_length=1, repr=False)
     content: str = Field(min_length=1, repr=False)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     approved: bool
-    api_version: str = Field(pattern=r"^[0-9]{6}$")
+    api_version: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict, repr=False)
 
     @field_validator("author_urn")
@@ -56,6 +57,13 @@ class PublishRequest(BaseModel):
     def validate_content(cls, value: str) -> str:
         """Reject unsafe publication text before it reaches an adapter."""
         return _reject_unsafe_content(value)
+
+    @model_validator(mode="after")
+    def validate_platform_fields(self) -> PublishRequest:
+        """Require the author and API version shape for the selected platform."""
+        _validate_author_reference(self.platform, self.author_urn)
+        _validate_api_version(self.platform, self.api_version)
+        return self
 
 
 class PublishResult(BaseModel):
@@ -72,7 +80,7 @@ class PublishResult(BaseModel):
     occurred_at: datetime
     http_status: int | None = None
     api_endpoint: str = Field(min_length=1)
-    api_version: str = Field(pattern=r"^[0-9]{6}$")
+    api_version: str = Field(min_length=1)
     error_category: str | None = None
     safe_error_message: str | None = None
 
@@ -81,11 +89,6 @@ class PublishResult(BaseModel):
     def validate_external_post_id(cls, value: str | None) -> str | None:
         """Reject unsafe or malformed identifiers returned by an adapter."""
         validated = _reject_control_characters(value, label="external post ID")
-        if (
-            validated is not None
-            and _EXTERNAL_POST_ID_PATTERN.fullmatch(validated) is None
-        ):
-            raise ValueError("external post ID has invalid format")
         return validated
 
     @field_validator("occurred_at")
@@ -102,6 +105,8 @@ class PublishResult(BaseModel):
     @model_validator(mode="after")
     def validate_success(self) -> PublishResult:
         """Require the fields that make an adapter success unambiguous."""
+        _validate_external_post_id(self.platform, self.external_post_id)
+        _validate_api_version(self.platform, self.api_version)
         if self.status is PublicationStatus.SUCCEEDED:
             if self.external_post_id is None or self.http_status != 201:
                 raise ValueError(
@@ -131,7 +136,7 @@ class PublishReceipt(BaseModel):
     created_at: datetime
     published_at: datetime | None = None
     api_endpoint: str = Field(min_length=1)
-    api_version: str = Field(pattern=r"^[0-9]{6}$")
+    api_version: str = Field(min_length=1)
     http_status: int | None = None
     error_category: str | None = None
     safe_error_message: str | None = None
@@ -142,11 +147,6 @@ class PublishReceipt(BaseModel):
     def validate_external_post_id(cls, value: str | None) -> str | None:
         """Reject unsafe or malformed identifiers before persistence."""
         validated = _reject_control_characters(value, label="external post ID")
-        if (
-            validated is not None
-            and _EXTERNAL_POST_ID_PATTERN.fullmatch(validated) is None
-        ):
-            raise ValueError("external post ID has invalid format")
         return validated
 
     @field_validator("created_at", "published_at")
@@ -161,6 +161,8 @@ class PublishReceipt(BaseModel):
     @model_validator(mode="after")
     def validate_status_fields(self) -> PublishReceipt:
         """Keep confirmed and unconfirmed publication fields consistent."""
+        _validate_external_post_id(self.platform, self.external_post_id)
+        _validate_api_version(self.platform, self.api_version)
         if self.status is PublicationStatus.SUCCEEDED:
             if (
                 self.external_post_id is None
@@ -310,3 +312,44 @@ def _reject_unsafe_content(value: str) -> str:
     ):
         raise ValueError("publication content contains unsafe control characters")
     return value
+
+
+def _validate_author_reference(
+    platform: PublicationPlatform,
+    value: str,
+) -> None:
+    pattern = (
+        _LINKEDIN_AUTHOR_PATTERN
+        if platform is PublicationPlatform.LINKEDIN
+        else _X_POST_ID_PATTERN
+    )
+    if pattern.fullmatch(value) is None:
+        raise ValueError("author reference has invalid format for platform")
+
+
+def _validate_external_post_id(
+    platform: PublicationPlatform,
+    value: str | None,
+) -> None:
+    if value is None:
+        return
+    pattern = (
+        _LINKEDIN_POST_ID_PATTERN
+        if platform is PublicationPlatform.LINKEDIN
+        else _X_POST_ID_PATTERN
+    )
+    if pattern.fullmatch(value) is None:
+        raise ValueError("external post ID has invalid format for platform")
+
+
+def _validate_api_version(
+    platform: PublicationPlatform,
+    value: str,
+) -> None:
+    valid = (
+        re.fullmatch(r"[0-9]{6}", value) is not None
+        if platform is PublicationPlatform.LINKEDIN
+        else value == "2"
+    )
+    if not valid:
+        raise ValueError("API version has invalid format for platform")

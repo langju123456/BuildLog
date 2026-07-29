@@ -5,24 +5,23 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 from time import monotonic
+from typing import Callable, Protocol
 from uuid import uuid4
 
 from pydantic import ValidationError
 
-from buildlog.linkedin_config import LinkedInSettings
+from buildlog.exceptions import BuildLogError
 from buildlog.linkedin_errors import (
     DuplicatePublicationBlockedError,
     IndeterminatePublicationError,
     IndeterminatePublicationBlockedError,
     LinkedInAPIError,
-    LinkedInError,
     LinkedInNetworkError,
     LinkedInRequestTimeoutError,
     LinkedInServerError,
     PublicationApprovalRequiredError,
     PublicationReceiptPersistenceError,
 )
-from buildlog.linkedin_identity import LinkedInIdentity, LinkedInIdentityService
 from buildlog.linkedin_security import redact_linkedin_secrets
 from buildlog.publication_content import FinalArtifactResolver
 from buildlog.publishing_models import (
@@ -38,42 +37,77 @@ from buildlog.publishing_observability import PublishingEventRecorder
 from buildlog.publishing_repository import PublishingRepository
 
 
+class PublicationSettings(Protocol):
+    """Platform settings required by publication orchestration."""
+
+    api_version: str
+
+    @property
+    def posts_url(self) -> str:
+        """Return the create-post endpoint."""
+
+
+class PublicationIdentity(Protocol):
+    """Authenticated identity consumed by publication orchestration."""
+
+    account_reference: str
+    display_name: str
+    author_reference: str
+    mapping_source: str
+
+
+class PublicationIdentityService(Protocol):
+    """Resolve one authenticated platform identity."""
+
+    def resolve(self) -> PublicationIdentity:
+        """Return the current authenticated identity."""
+
+
 class PublishingService:
     """Preview, approve, deduplicate, publish, observe, and persist receipts."""
 
     def __init__(
         self,
-        settings: LinkedInSettings,
+        settings: PublicationSettings,
         resolver: FinalArtifactResolver,
-        identity_service: LinkedInIdentityService,
+        identity_service: PublicationIdentityService,
         publisher: Publisher,
         repository: PublishingRepository,
+        *,
+        platform: PublicationPlatform = PublicationPlatform.LINKEDIN,
+        platform_name: str = "LinkedIn",
+        content_validator: Callable[[str], None] | None = None,
     ) -> None:
         self.settings = settings
         self.resolver = resolver
         self.identity_service = identity_service
         self.publisher = publisher
         self.repository = repository
+        self.platform = platform
+        self.platform_name = platform_name
+        self.content_validator = content_validator
 
     def preview(self, run_id: str) -> PublicationPreview:
         """Return the exact content and duplicate state without publishing."""
         artifact = self.resolver.resolve(run_id)
+        if self.content_validator is not None:
+            self.content_validator(artifact.content)
         recorder = PublishingEventRecorder(run_id, artifact.artifact_path.parent)
         identity = self._resolve_identity(recorder)
         duplicate = self.repository.find_successful_publication(
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             account_reference=identity.account_reference,
             content_hash=artifact.content_hash,
         )
         indeterminate = self.repository.find_indeterminate_publication(
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             account_reference=identity.account_reference,
             content_hash=artifact.content_hash,
         )
         recorder.emit(
             "publish_previewed",
             {
-                "platform": PublicationPlatform.LINKEDIN.value,
+                "platform": self.platform.value,
                 "artifact_id": artifact.artifact_id,
                 "account_reference": identity.account_reference,
                 "content_hash": artifact.content_hash,
@@ -84,7 +118,7 @@ class PublishingService:
             },
         )
         return PublicationPreview(
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             run_id=run_id,
             artifact_id=artifact.artifact_id,
             artifact_path=str(artifact.artifact_path),
@@ -120,12 +154,14 @@ class PublishingService:
     ) -> PublishReceipt:
         """Publish one run after approval, persisting every network outcome."""
         artifact = self.resolver.resolve(run_id)
+        if self.content_validator is not None:
+            self.content_validator(artifact.content)
         recorder = PublishingEventRecorder(run_id, artifact.artifact_path.parent)
         if not approved:
             recorder.emit(
                 "publish_approval_required",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "artifact_id": artifact.artifact_id,
                     "content_hash": artifact.content_hash,
                 },
@@ -138,7 +174,7 @@ class PublishingService:
             recorder.emit(
                 "publish_approval_required",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "artifact_id": artifact.artifact_id,
                     "content_hash": artifact.content_hash,
                     "reason": "approval_not_bound_to_preview",
@@ -151,7 +187,7 @@ class PublishingService:
             recorder.emit(
                 "publish_approval_stale",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "artifact_id": artifact.artifact_id,
                     "approved_content_hash": approved_content_hash,
                     "current_content_hash": artifact.content_hash,
@@ -167,7 +203,7 @@ class PublishingService:
             recorder.emit(
                 "publish_approval_stale",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "artifact_id": artifact.artifact_id,
                     "content_hash": artifact.content_hash,
                     "approved_account_reference": approved_account_reference,
@@ -176,16 +212,16 @@ class PublishingService:
                 },
             )
             raise PublicationApprovalRequiredError(
-                "The authenticated LinkedIn account changed after preview. "
+                f"The authenticated {self.platform_name} account changed after preview. "
                 "Preview the run again before publishing."
             )
         duplicate = self.repository.find_successful_publication(
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             account_reference=identity.account_reference,
             content_hash=artifact.content_hash,
         )
         indeterminate = self.repository.find_indeterminate_publication(
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             account_reference=identity.account_reference,
             content_hash=artifact.content_hash,
         )
@@ -193,7 +229,7 @@ class PublishingService:
             recorder.emit(
                 "publish_duplicate_blocked",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "account_reference": identity.account_reference,
                     "content_hash": artifact.content_hash,
                     "prior_receipt_id": duplicate.receipt_id,
@@ -208,7 +244,7 @@ class PublishingService:
             recorder.emit(
                 "publish_indeterminate_blocked",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "account_reference": identity.account_reference,
                     "content_hash": artifact.content_hash,
                     "prior_receipt_id": indeterminate.receipt_id,
@@ -218,16 +254,17 @@ class PublishingService:
             raise IndeterminatePublicationBlockedError(
                 indeterminate.receipt_id,
                 indeterminate.created_at,
+                self.platform_name,
             )
         prior_receipt = _latest_prior_receipt(duplicate, indeterminate)
 
-        attempt_id = f"linkedin-{uuid4()}"
+        attempt_id = f"{self.platform.value}-{uuid4()}"
         created_at = datetime.now(UTC)
         recorder.emit(
             "publish_approved",
             {
                 "attempt_id": attempt_id,
-                "platform": PublicationPlatform.LINKEDIN.value,
+                "platform": self.platform.value,
                 "account_reference": identity.account_reference,
                 "content_hash": artifact.content_hash,
                 "allow_duplicate": allow_duplicate,
@@ -237,9 +274,9 @@ class PublishingService:
             attempt_id=attempt_id,
             run_id=run_id,
             artifact_id=artifact.artifact_id,
-            platform=PublicationPlatform.LINKEDIN,
+            platform=self.platform,
             account_reference=identity.account_reference,
-            author_urn=identity.person_urn,
+            author_urn=identity.author_reference,
             content=artifact.content,
             content_hash=artifact.content_hash,
             approved=True,
@@ -250,7 +287,7 @@ class PublishingService:
             "publish_started",
             {
                 "attempt_id": attempt_id,
-                "platform": PublicationPlatform.LINKEDIN.value,
+                "platform": self.platform.value,
                 "account_reference": identity.account_reference,
                 "content_hash": artifact.content_hash,
                 "content_length": len(artifact.content),
@@ -260,16 +297,21 @@ class PublishingService:
         result: PublishResult | None = None
         try:
             raw_result = self.publisher.publish(request)
-            result = _revalidate_publish_result(raw_result)
+            result = _revalidate_publish_result(
+                raw_result,
+                platform_name=self.platform_name,
+            )
             _validate_publish_result(
                 request,
                 result,
                 expected_api_endpoint=self.settings.posts_url,
+                platform_name=self.platform_name,
             )
         except KeyboardInterrupt as interruption:
             error = IndeterminatePublicationError(
-                "LinkedIn submission was interrupted before its outcome was "
-                "confirmed. The post may exist; inspect LinkedIn and the local "
+                f"{self.platform_name} submission was interrupted before its "
+                "outcome was confirmed. The post may exist; inspect "
+                f"{self.platform_name} and the local "
                 "receipt before another attempt."
             )
             receipt = self._failure_receipt(
@@ -319,7 +361,7 @@ class PublishingService:
                 preserve_outcome=True,
             )
             raise
-        except LinkedInError as exc:
+        except BuildLogError as exc:
             receipt = self._failure_receipt(
                 request,
                 created_at=created_at,
@@ -341,7 +383,7 @@ class PublishingService:
         except Exception as exc:
             error = IndeterminatePublicationError(
                 "The publisher failed unexpectedly after submission began. The "
-                "post may exist; inspect LinkedIn and the local receipt before "
+                f"post may exist; inspect {self.platform_name} and the local receipt before "
                 "another attempt."
             )
             receipt = self._failure_receipt(
@@ -393,24 +435,24 @@ class PublishingService:
     def _resolve_identity(
         self,
         recorder: PublishingEventRecorder,
-    ) -> LinkedInIdentity:
+    ) -> PublicationIdentity:
         try:
             identity = self.identity_service.resolve()
-        except LinkedInError as exc:
+        except BuildLogError as exc:
             recorder.emit(
-                "linkedin_identity_failed",
+                f"{self.platform.value}_identity_failed",
                 {
-                    "platform": PublicationPlatform.LINKEDIN.value,
+                    "platform": self.platform.value,
                     "error_category": _error_category(exc),
                 },
             )
             raise
         recorder.emit(
-            "linkedin_identity_resolved",
+            f"{self.platform.value}_identity_resolved",
             {
-                "platform": PublicationPlatform.LINKEDIN.value,
+                "platform": self.platform.value,
                 "account_reference": identity.account_reference,
-                "author_mapping_source": identity.author_mapping_source,
+                "author_mapping_source": identity.mapping_source,
             },
         )
         return identity
@@ -420,7 +462,7 @@ class PublishingService:
         receipt: PublishReceipt,
         *,
         recorder: PublishingEventRecorder,
-        publication_error: LinkedInError | None = None,
+        publication_error: BuildLogError | None = None,
     ) -> None:
         try:
             self.repository.save_publish_receipt(receipt)
@@ -441,16 +483,16 @@ class PublishingService:
             )
             if receipt.status is PublicationStatus.SUCCEEDED:
                 raise PublicationReceiptPersistenceError(
-                    "LinkedIn created the post "
+                    f"{self.platform_name} created the post "
                     f"({receipt.external_post_id}), but the local receipt could "
                     "not be saved. Do not publish again; repair the local database "
                     "and record the external post before another attempt."
                 ) from exc
             if publication_error is not None:
                 raise PublicationReceiptPersistenceError(
-                    f"LinkedIn publication ended as {receipt.status.value}, and "
+                    f"{self.platform_name} publication ended as {receipt.status.value}, and "
                     "the local receipt could not be saved. Do not retry until "
-                    "LinkedIn and the local database have been inspected."
+                    f"{self.platform_name} and the local database have been inspected."
                 ) from exc
             raise PublicationReceiptPersistenceError(
                 "The local publication receipt could not be saved."
@@ -462,7 +504,7 @@ class PublishingService:
         *,
         created_at: datetime,
         status: PublicationStatus,
-        error: LinkedInError,
+        error: BuildLogError,
         prior_receipt: PublishReceipt | None,
         external_post_id: str | None = None,
     ) -> PublishReceipt:
@@ -493,7 +535,7 @@ class PublishingService:
         )
 
 
-def _error_category(error: LinkedInError) -> str:
+def _error_category(error: BuildLogError) -> str:
     name = type(error).__name__
     if isinstance(error, IndeterminatePublicationError):
         cause = error.__cause__
@@ -519,6 +561,7 @@ def _validate_publish_result(
     result: PublishResult,
     *,
     expected_api_endpoint: str,
+    platform_name: str = "LinkedIn",
 ) -> None:
     mismatches = [
         name
@@ -542,22 +585,26 @@ def _validate_publish_result(
         fields = ", ".join(mismatches)
         raise IndeterminatePublicationError(
             "The publisher returned an inconsistent success result "
-            f"({fields}). Do not retry until LinkedIn has been inspected."
+            f"({fields}). Do not retry until {platform_name} has been inspected."
         )
 
 
-def _revalidate_publish_result(value: object) -> PublishResult:
+def _revalidate_publish_result(
+    value: object,
+    *,
+    platform_name: str = "LinkedIn",
+) -> PublishResult:
     if not isinstance(value, PublishResult):
         raise IndeterminatePublicationError(
             "The publisher returned an invalid result type. Do not retry until "
-            "the adapter and LinkedIn have been inspected."
+            f"the adapter and {platform_name} have been inspected."
         )
     try:
         return PublishResult.model_validate(value.model_dump(mode="python"))
     except ValidationError as exc:
         raise IndeterminatePublicationError(
             "The publisher returned an invalid result. Do not retry until the "
-            "adapter and LinkedIn have been inspected."
+            f"adapter and {platform_name} have been inspected."
         ) from exc
 
 

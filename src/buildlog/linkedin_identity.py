@@ -32,6 +32,16 @@ class LinkedInIdentity(BaseModel):
     author_mapping_source: str = "oidc_userinfo_sub_inferred"
 
     @property
+    def author_reference(self) -> str:
+        """Return the platform author identifier consumed by publishing."""
+        return self.person_urn
+
+    @property
+    def mapping_source(self) -> str:
+        """Return how the platform author identifier was derived."""
+        return self.author_mapping_source
+
+    @property
     def redacted_subject(self) -> str:
         """Return a terminal-safe identifier."""
         return redacted_identifier(self.subject)

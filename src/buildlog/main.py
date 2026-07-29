@@ -13,6 +13,7 @@ from buildlog.linkedin_cli import linkedin_main
 from buildlog.package_cli import package_main
 from buildlog.pipeline import run_pipeline
 from buildlog.sqlalchemy_repository import SQLAlchemyRunRepository
+from buildlog.x_cli import x_main
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,13 +23,16 @@ def main(argv: list[str] | None = None) -> int:
         return linkedin_main(command_args[1:])
     if command_args and command_args[0] == "package":
         return package_main(command_args[1:])
+    if command_args and command_args[0] == "x":
+        return x_main(command_args[1:])
 
     parser = argparse.ArgumentParser(
         description="Generate a LinkedIn draft from one iteration JSON file.",
         epilog=(
             "LinkedIn authentication and publishing: "
             "buildlog linkedin --help. Local publishing packages: "
-            "buildlog package --help"
+            "buildlog package --help. X authentication and publishing: "
+            "buildlog x --help"
         ),
     )
     parser.add_argument("input_path", type=Path)

@@ -25,8 +25,8 @@ story with weak grounding.
 ## 🧩 Product Capabilities
 
 BuildLog is an evidence-to-artifact AI engineering workflow. In v0.2, it
-proves this workflow with one output type and destination: a human-reviewed
-LinkedIn technical post that can be published only after explicit approval.
+proves this workflow with reviewed technical content, local publishing
+packages, and human-controlled text adapters for LinkedIn and X.
 
 Its current business capabilities are:
 
@@ -46,9 +46,10 @@ Its current business capabilities are:
 - **Replayable engineering workflow:** preserves enough metadata to rerun the
   same engineering iteration under the same prompts, model configuration, and
   code state as far as practical.
-- **Human-controlled LinkedIn publishing:** authenticates one local LinkedIn
-  member, previews the exact final artifact, blocks duplicate posts, requires
-  explicit approval, and stores a safe publication receipt.
+- **Human-controlled social publishing:** authenticates one local account,
+  previews the exact final artifact, blocks duplicate posts, requires explicit
+  approval, and stores a safe publication receipt. LinkedIn has been validated
+  live; X is implemented and awaiting manual OAuth validation.
 - **Reviewable publishing packages:** turns one reviewed run into a local
   LinkedIn-ready caption, grounded card plan, deterministic PNG cards, alt
   text, and a versioned manifest without publishing them.
@@ -89,9 +90,9 @@ missing, never estimated.
 **Human review**
 
 BuildLog never makes the publishing decision. The user remains responsible for
-factual accuracy, confidentiality, tone, and final approval. LinkedIn
-publication requires a preview, the `--confirm` flag, and the exact interactive
-confirmation `PUBLISH`.
+factual accuracy, confidentiality, tone, and final approval. LinkedIn and X
+publication both require a preview, the `--confirm` flag, and the exact
+interactive confirmation `PUBLISH`.
 
 ## ⚙️ How It Works
 
@@ -145,6 +146,7 @@ Currently included:
 - Exact final-artifact preview and explicit publication approval
 - Text-only personal LinkedIn publishing through a replaceable adapter
 - Duplicate protection, safe receipts, and append-only publication events
+- OAuth 2.0 PKCE, verified identity, exact preview, and text-only X publishing
 - Local LinkedIn-targeted publishing packages built from reviewed runs
 - Validated, grounded card specifications and deterministic 1080x1350 PNGs
 - A package manifest with source, prompt, model, caption, and asset hashes
@@ -154,6 +156,7 @@ Not included:
 - Automatic, scheduled, or background publishing
 - Automatic LinkedIn media upload, company-page publishing, analytics, or
   deletion
+- X media upload, threads, replies, scheduling, analytics, or deletion
 - Image-generation APIs, dynamic template systems, or multi-platform packages
 - Automatic GitHub, commit, issue, or diff collection
 - Web UI, API, accounts, or cloud deployment
@@ -285,6 +288,25 @@ test](docs/linkedin/manual-smoke-test.md) before publishing.
 > completed successfully on 2026-07-29 with HTTP 201 and a persisted receipt.
 > LinkedIn accepted the OIDC-sub-derived Person URN for this app, while the
 > cross-document mapping remains explicitly labeled as inferred.
+
+## Publish to X
+
+The X adapter reuses the same preview, approval, duplicate-suppression,
+single-attempt, indeterminate-result, and receipt workflow. It supports one
+standard text post of at most 280 weighted characters.
+
+```bash
+.venv/bin/buildlog x status
+.venv/bin/buildlog x login
+.venv/bin/buildlog x whoami
+.venv/bin/buildlog x preview <run-id>
+.venv/bin/buildlog x publish <run-id> --confirm
+```
+
+Preview never publishes. The final command requires typing `PUBLISH`, makes
+one `POST /2/tweets` request, and never retries automatically. X OAuth and
+live publishing remain pending manual validation; see the
+[X setup guide](docs/x/setup.md).
 
 ## Learn More
 
