@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import json
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import Any
-from uuid import uuid4
 
 from buildlog.config import Settings
+from buildlog.event_writer import AppendOnlyRunEventWriter
 from buildlog.hashing import sha256_file
 from buildlog.models import Evaluation
 from buildlog.observability_models import (
@@ -19,7 +18,6 @@ from buildlog.observability_models import (
     ArtifactDependency,
     ErrorObservation,
     LLMCallObservation,
-    ObservationEvent,
     ObservabilityStatus,
     PipelineStatus,
     ReproducibilityReport,
@@ -132,7 +130,6 @@ class RunObserver:
         self.revision_output_changed: bool | None = None
         self.revision_improvement_status = RevisionImprovementStatus.NOT_APPLICABLE
         self.observability_issues: list[str] = []
-        self._event_sequence = 0
         self._recorded_error_objects: set[int] = set()
         self._projection_enabled = False
         self._persistence_duration_ms = 0
@@ -141,6 +138,16 @@ class RunObserver:
         self._timeline_path = self.run_dir / "timeline.json"
         self._events_available = True
         self._timeline_available = True
+        self._event_writer: AppendOnlyRunEventWriter | None = None
+        try:
+            self._event_writer = AppendOnlyRunEventWriter(
+                self._events_path,
+                self.run_id,
+                now=self.clock.now,
+            )
+        except OSError as exc:
+            self._events_available = False
+            self._mark_partial(f"event writer initialization failed: {exc}")
         self._finalized = False
         self._append_event("run_started", occurred_at=self.started_at)
 
@@ -715,20 +722,15 @@ class RunObserver:
         *,
         occurred_at: datetime | None = None,
     ) -> None:
-        self._event_sequence += 1
-        event = ObservationEvent(
-            event_id=f"{self.run_id}:event:{self._event_sequence}",
-            sequence=self._event_sequence,
-            run_id=self.run_id,
-            event_type=event_type,
-            occurred_at=occurred_at or self.clock.now(),
-            step_name=step_name,
-            payload=payload or {},
-        )
+        if self._event_writer is None:
+            return
         try:
-            with self._events_path.open("a", encoding="utf-8") as handle:
-                handle.write(event.model_dump_json())
-                handle.write("\n")
+            self._event_writer.append(
+                event_type,
+                step_name=step_name,
+                payload=payload,
+                occurred_at=occurred_at,
+            )
             self._events_available = True
         except OSError as exc:
             self._events_available = False

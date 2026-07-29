@@ -8,11 +8,12 @@
 
 **Name:** BuildLog
 
-**Current version:** v0.1
+**Current version:** v0.2
 
 **Project type:** AI engineering communication engine
 
-**Current v0.1 output:** LinkedIn post draft
+**Current output:** LinkedIn post draft with optional, explicitly approved
+personal-member publishing
 
 **Long-term product category:** Engineering communication and knowledge
 platform
@@ -104,9 +105,21 @@ A user can provide evidence from a real development iteration, run the pipeline,
 
 ---
 
-## 5. Non-goals for v0.1
+### v0.2 publishing goal
 
-The following are explicitly outside the current implementation scope:
+BuildLog v0.2 adds one downstream destination capability:
+
+> Publish an existing reviewed final artifact as one text-only personal
+> LinkedIn post only after exact human preview and explicit approval.
+
+Publishing does not change generation, evaluation, revision, prompts, or the
+final artifact contract. It is a separate operation after a completed run.
+
+---
+
+## 5. Historical non-goals for v0.1
+
+The following were explicitly outside the v0.1 generation baseline:
 
 - automatic LinkedIn authentication
 - automatic LinkedIn publishing
@@ -132,7 +145,10 @@ The following are explicitly outside the current implementation scope:
 - article generation
 - content scheduling
 
-These may be considered later, but they must not block v0.1.
+v0.2 intentionally implements the narrowly scoped LinkedIn authentication and
+human-controlled publishing items. The remaining items are still out of scope.
+There is no automatic, scheduled, background, organization-page, or media
+publishing.
 
 ---
 
@@ -263,6 +279,7 @@ Completed or current baselines:
 - Generalization Baseline
 - Example Showcase
 - Agent Observability Baseline
+- LinkedIn Publishing Baseline (implemented early in v0.2)
 
 Planned capability baselines:
 
@@ -274,9 +291,10 @@ Planned capability baselines:
 - Engineering Memory Baseline
 - Multimodal Communication Baseline
 - Workflow Automation Baseline
-- Publishing Baseline
+- Publishing Baseline (conceptual roadmap position retained; first vertical
+  slice implemented early in v0.2)
 
-Each planned baseline is out of scope for v0.1 unless explicitly moved into
+Each planned baseline is out of scope unless explicitly moved into
 the current task file.
 
 ### 6.9 Product, portfolio, and learning dimensions
@@ -490,6 +508,8 @@ Optional structured context such as:
 9. If required, the reviser performs one revision.
 10. The system stores all artifacts.
 11. The final Markdown draft is returned for human review.
+12. In v0.2, a separate command may resolve that existing final artifact,
+    preview it, require exact human approval, and publish it to LinkedIn.
 ```
 
 ### 9.2 Revision rule
@@ -540,6 +560,9 @@ The system should include a final human-review warning reminding the user to che
 - customer data
 - private repository details
 - unpublished business information
+
+The warning remains in `06_final.md` for inspection. The downstream publishing
+resolver removes only this exact fixed warning from the network post body.
 
 ---
 
@@ -592,6 +615,16 @@ The system should include a final human-review warning reminding the user to che
                          ▼
 ┌─────────────────────────────┐
 │ Filesystem + SQLite Output  │  Deterministic
+└─────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│ Human Preview + Approval    │  Deterministic, downstream
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│ LinkedIn Publisher Adapter  │  External I/O, v0.2
 └─────────────────────────────┘
 ```
 
@@ -986,6 +1019,16 @@ Existing business tables retain their meaning:
 5. `evaluations`
 6. `prompt_versions`
 
+The v0.2 publishing baseline adds one operational table:
+
+1. `publish_receipts`
+
+It stores platform, account reference, content hash, outcome, external post
+identifier, API version, safe error metadata, and duplicate lineage. It never
+stores post bodies, access tokens, refresh tokens, authorization codes, client
+secrets, or raw ID tokens. Publication failure does not change the completed
+generation run.
+
 The observability baseline adds:
 
 1. `run_observations`
@@ -1057,6 +1100,7 @@ persistence behavior.
 | Output format | Markdown |
 | Metadata persistence | SQLite |
 | Database access | SQLAlchemy 2.0 |
+| External HTTP | HTTPX |
 | Testing | Pytest |
 | Logging | Python `logging` |
 | Packaging | `pyproject.toml` |
@@ -1121,6 +1165,7 @@ BuildLog/
 │       ├── __init__.py
 │       ├── main.py
 │       ├── config.py
+│       ├── event_writer.py
 │       ├── models.py
 │       ├── domain.py
 │       ├── hashing.py
@@ -1136,11 +1181,29 @@ BuildLog/
 │       ├── observability_repository.py
 │       ├── observer.py
 │       ├── pipeline.py
+│       ├── review_policy.py
+│       ├── terminal_safety.py
 │       ├── trace.py
 │       ├── repository.py
 │       ├── run_persistence.py
 │       ├── persistence_models.py
 │       ├── sqlalchemy_observability_repository.py
+│       ├── linkedin_callback.py
+│       ├── linkedin_cli.py
+│       ├── linkedin_config.py
+│       ├── linkedin_errors.py
+│       ├── linkedin_http.py
+│       ├── linkedin_identity.py
+│       ├── linkedin_oauth.py
+│       ├── linkedin_publisher.py
+│       ├── linkedin_security.py
+│       ├── linkedin_token_store.py
+│       ├── publication_content.py
+│       ├── publishing_models.py
+│       ├── publishing_observability.py
+│       ├── publishing_repository.py
+│       ├── publishing_service.py
+│       ├── sqlalchemy_publishing_repository.py
 │       ├── sqlalchemy_repository.py
 │       └── exceptions.py
 ├── tests/
@@ -1153,11 +1216,21 @@ BuildLog/
 │   ├── test_observability.py
 │   ├── test_prompt_loader.py
 │   ├── test_trace.py
+│   ├── test_event_writer.py
+│   ├── test_linkedin_cli.py
+│   ├── test_linkedin_config_and_security.py
+│   ├── test_linkedin_identity_and_publisher.py
+│   ├── test_linkedin_oauth.py
+│   ├── test_publishing_service.py
 │   └── fixtures/
 │       └── valid_iteration.json
 ├── runs/
 │   └── .gitkeep
 └── docs/
+    ├── adr/
+    ├── implementation/
+    ├── linkedin/
+    ├── research/
     ├── ideas.md
     ├── output_quality_baseline.md
     └── generalization_baseline.md
@@ -1309,6 +1382,37 @@ Defines project-specific exceptions such as:
 - `ModelResponseError`
 - `StructuredOutputError`
 - `TraceWriteError`
+
+### LinkedIn publishing modules
+
+- `review_policy.py` owns the exact cross-stage human-review warning without
+  coupling generation to publishing.
+- `terminal_safety.py` identifies control characters that can make terminal
+  approval text misleading without introducing a platform dependency.
+- `event_writer.py` provides the reusable crash-tolerant append-only event
+  writer used by generation and publishing observability.
+- `linkedin_config.py` loads publishing configuration independently from
+  generation settings.
+- `linkedin_callback.py`, `linkedin_http.py`, `linkedin_security.py`, and
+  `linkedin_errors.py` isolate callback handling, transport, redaction, and
+  typed failures.
+- `linkedin_token_store.py` stores OAuth state and tokens atomically in a
+  restricted user-level directory.
+- `linkedin_oauth.py` implements Authorization Code exchange without automatic
+  refresh.
+- `linkedin_identity.py` resolves the authenticated member through OIDC
+  userinfo.
+- `publication_content.py` resolves only a completed final artifact and strips
+  the exact fixed review footer.
+- `publishing_models.py`, `publishing_repository.py`, and
+  `publishing_service.py` define approval, duplicate, result, and receipt
+  behavior without LinkedIn HTTP details.
+- `linkedin_publisher.py` is the text-only `/rest/posts` adapter.
+- `publishing_observability.py` appends safe events to the existing run stream.
+- `sqlalchemy_publishing_repository.py` persists receipt metadata without post
+  bodies or credentials.
+- `linkedin_cli.py` exposes the local login, status, whoami, preview, publish,
+  and logout flow.
 
 ---
 
@@ -1469,6 +1573,25 @@ The process must return:
 - exit code `0` on success
 - non-zero exit code on failure
 
+LinkedIn commands added in v0.2:
+
+```bash
+buildlog linkedin login
+buildlog linkedin status
+buildlog linkedin whoami
+buildlog linkedin preview <run-id>
+buildlog linkedin publish <run-id> --confirm
+buildlog linkedin logout
+```
+
+`preview` never creates a post. `publish` requires `--confirm` and the exact
+interactive input `PUBLISH`. Duplicate successful content is blocked by
+default. A timeout, transport interruption, user interrupt during submission,
+unexpected 2xx, HTTP 408, HTTP 5xx, or missing success identifier after
+submission is recorded as `indeterminate`. A matching indeterminate receipt
+also blocks publication until the human inspects LinkedIn and explicitly
+overrides the block.
+
 ---
 
 ## 20. Environment configuration
@@ -1488,6 +1611,10 @@ BUILDLOG_EVAL_THRESHOLD_READABILITY=7
 BUILDLOG_EVAL_THRESHOLD_VALUE=7
 BUILDLOG_EVAL_THRESHOLD_EVIDENCE=7
 BUILDLOG_DATABASE_URL=sqlite:///buildlog.db
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+LINKEDIN_REDIRECT_URI=http://localhost:8765/auth/linkedin/callback
+LINKEDIN_API_VERSION=202607
 ```
 
 No real secrets should be committed.
@@ -1523,8 +1650,28 @@ v0.1 is complete when:
 - [ ] The final draft is written to Markdown.
 - [ ] Unit tests cover deterministic behavior.
 - [ ] The README explains how to run the project.
-- [ ] No automatic LinkedIn publishing exists.
+- [ ] No automatic LinkedIn publishing exists in the v0.1 generation
+      baseline.
 - [ ] No unsupported claims are present in the sample result.
+
+---
+
+### Definition of done for the v0.2 publishing baseline
+
+- [x] Existing generation behavior and artifacts remain unchanged.
+- [x] OAuth state is one-time, validated, and stored outside runs.
+- [x] Tokens are atomic, private, local, redacted, and deletable.
+- [x] Authenticated identity is resolved without trusting an unverified JWT.
+- [x] Preview shows the exact final content and cannot publish.
+- [x] Human approval is mandatory.
+- [x] Duplicate successful publication is blocked by default.
+- [x] Text-only personal-member publishing is behind a publisher boundary.
+- [x] Success, failure, and indeterminate receipts are persisted.
+- [x] Publishing events contain hashes and safe metadata, not content or
+      credentials.
+- [x] All automated network tests are mocked.
+- [x] Real OAuth and the first real post were completed only through separate,
+      explicit human approval.
 
 ---
 
@@ -1532,36 +1679,33 @@ v0.1 is complete when:
 
 ### Objective
 
-Build the smallest complete local pipeline that transforms the existing local-agent development experience into a LinkedIn draft.
+Add the smallest secure and human-controlled downstream LinkedIn publishing
+capability for an existing reviewed BuildLog final artifact.
 
 ### Required sequence
 
 ```text
-Create project structure
+Research endpoint and identity contracts
         ↓
-Define Pydantic models
+Record publishing ADR
         ↓
-Create sample iteration input
+Implement OAuth and private token storage
         ↓
-Implement deterministic input pipeline
+Resolve authenticated member
         ↓
-Implement LiteLLM client
+Resolve existing final artifact
         ↓
-Implement planner
+Preview and explicit approval
         ↓
-Implement writer
+Duplicate protection
         ↓
-Implement evaluator
+LinkedIn text adapter
         ↓
-Implement one-pass revision
+Persist receipts and append safe events
         ↓
-Implement trace storage
+Run mocked integration tests
         ↓
-Implement SQLite metadata persistence
-        ↓
-Add tests
-        ↓
-Run the sample end to end
+Complete real OAuth and first post through explicit manual review
 ```
 
 ### Freeze rule
@@ -1619,7 +1763,7 @@ These are long-term possibilities, not v0.1 requirements.
 When implementing this project:
 
 1. Read this entire file before writing code.
-2. Do not expand the v0.1 scope.
+2. Do not expand the active scope beyond `TASK.md`.
 3. Implement deterministic components before LLM components.
 4. Use the repository structure defined above unless a concrete technical conflict exists.
 5. Keep prompts in separate versioned Markdown files.
@@ -1627,7 +1771,8 @@ When implementing this project:
 7. Create tests for deterministic business logic.
 8. Store every major pipeline artifact.
 9. Permit at most one automatic revision.
-10. Do not implement LinkedIn publishing.
+10. Keep LinkedIn publishing downstream, text-only, personal-member,
+    human-controlled, and independent from generation.
 11. Use only the specified SQLite persistence layer; do not introduce
     LangGraph, PostgreSQL, Redis, Celery, RAG, or a web UI in v0.1.
 12. Before making a significant architectural change, document the reason.

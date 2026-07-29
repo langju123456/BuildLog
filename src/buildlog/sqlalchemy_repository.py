@@ -1,4 +1,4 @@
-"""SQLAlchemy-backed repository using SQLite for BuildLog v0.1."""
+"""SQLAlchemy-backed repository using SQLite for BuildLog."""
 
 from __future__ import annotations
 
@@ -6,8 +6,10 @@ import sqlite3
 from datetime import datetime
 
 from sqlalchemy import create_engine, event, select, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 
 from buildlog.domain import (
     ArtifactRecord,
@@ -37,20 +39,35 @@ from buildlog.persistence_models import (
 from buildlog.sqlalchemy_observability_repository import (
     SQLAlchemyObservabilityRepository,
 )
+from buildlog.sqlalchemy_publishing_repository import (
+    SQLAlchemyPublishingRepository,
+)
+from buildlog.publishing_models import (
+    PublishReceipt,
+    PublicationPlatform,
+)
 
 
 class SQLAlchemyRunRepository:
     """Persist BuildLog metadata through SQLAlchemy 2.0."""
 
     def __init__(self, database_url: str) -> None:
-        self.engine = create_engine(database_url)
+        database = make_url(database_url)
+        if (
+            database.get_backend_name() == "sqlite"
+            and database.database not in (None, "", ":memory:")
+        ):
+            self.engine = create_engine(database_url, poolclass=NullPool)
+        else:
+            self.engine = create_engine(database_url)
         if database_url.startswith("sqlite"):
             event.listen(self.engine, "connect", _enable_sqlite_foreign_keys)
         self._sessions = sessionmaker(self.engine, expire_on_commit=False)
         self._observability = SQLAlchemyObservabilityRepository(self.engine)
+        self._publishing = SQLAlchemyPublishingRepository(self.engine)
 
     def initialize(self) -> None:
-        """Create all v0.1 tables when they do not exist."""
+        """Create all current tables when they do not exist."""
         try:
             Base.metadata.create_all(self.engine)
         except SQLAlchemyError as exc:
@@ -267,6 +284,42 @@ class SQLAlchemyRunRepository:
     def list_artifact_dependencies(self, run_id: str) -> list[ArtifactDependency]:
         """Return direct artifact dependencies in id order."""
         return self._observability.list_artifact_dependencies(run_id)
+
+    def save_publish_receipt(self, receipt: PublishReceipt) -> None:
+        """Persist one downstream publication receipt."""
+        self._publishing.save_publish_receipt(receipt)
+
+    def get_publish_receipt(self, receipt_id: str) -> PublishReceipt | None:
+        """Return one publication receipt."""
+        return self._publishing.get_publish_receipt(receipt_id)
+
+    def find_successful_publication(
+        self,
+        *,
+        platform: PublicationPlatform,
+        account_reference: str,
+        content_hash: str,
+    ) -> PublishReceipt | None:
+        """Return the latest matching successful publication."""
+        return self._publishing.find_successful_publication(
+            platform=platform,
+            account_reference=account_reference,
+            content_hash=content_hash,
+        )
+
+    def find_indeterminate_publication(
+        self,
+        *,
+        platform: PublicationPlatform,
+        account_reference: str,
+        content_hash: str,
+    ) -> PublishReceipt | None:
+        """Return the latest matching unresolved publication attempt."""
+        return self._publishing.find_indeterminate_publication(
+            platform=platform,
+            account_reference=account_reference,
+            content_hash=content_hash,
+        )
 
     def _add(self, row: object, label: str) -> None:
         try:

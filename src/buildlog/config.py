@@ -32,8 +32,8 @@ def load_settings(project_root: Path | None = None) -> Settings:
     """Load settings from environment variables and defaults."""
     import os
 
-    load_dotenv()
     root = project_root or Path.cwd()
+    load_dotenv(root / ".env")
     return Settings(
         model=os.getenv("BUILDLOG_MODEL", "ollama_chat/qwen3"),
         model_digest=os.getenv("BUILDLOG_MODEL_DIGEST") or None,

@@ -280,3 +280,36 @@ class ArtifactDependencyTable(Base):
         ForeignKey("artifacts.id"),
         nullable=True,
     )
+
+
+class PublishReceiptTable(Base):
+    """Operational receipt for one downstream publication attempt."""
+
+    __tablename__ = "publish_receipts"
+    __table_args__ = (
+        UniqueConstraint("attempt_id", name="uq_publish_receipt_attempt"),
+    )
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(255), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("artifacts.id"), index=True)
+    platform: Mapped[str] = mapped_column(String(50), index=True)
+    account_reference: Mapped[str] = mapped_column(String(128), index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    external_post_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    api_endpoint: Mapped[str] = mapped_column(Text)
+    api_version: Mapped[str] = mapped_column(String(20))
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    safe_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duplicate_of_receipt_id: Mapped[str | None] = mapped_column(
+        ForeignKey("publish_receipts.id"),
+        nullable=True,
+    )

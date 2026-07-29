@@ -1,10 +1,14 @@
 .env
+.env.*
+!.env.example
+.buildlog/
 .DS_Store
 .venv/
 __pycache__/
 .pytest_cache/
 *.egg-info/
 buildlog.db
+*.db-journal
 *.db-shm
 *.db-wal
 runs/*

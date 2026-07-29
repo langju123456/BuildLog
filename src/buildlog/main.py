@@ -9,15 +9,26 @@ from pathlib import Path
 
 from buildlog.config import load_settings
 from buildlog.exceptions import BuildLogError
+from buildlog.linkedin_cli import linkedin_main
 from buildlog.pipeline import run_pipeline
 from buildlog.sqlalchemy_repository import SQLAlchemyRunRepository
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run BuildLog from the command line."""
-    parser = argparse.ArgumentParser(description="Generate a LinkedIn draft from one iteration JSON file.")
+    command_args = list(argv) if argv is not None else sys.argv[1:]
+    if command_args and command_args[0] == "linkedin":
+        return linkedin_main(command_args[1:])
+
+    parser = argparse.ArgumentParser(
+        description="Generate a LinkedIn draft from one iteration JSON file.",
+        epilog=(
+            "LinkedIn authentication and publishing: "
+            "buildlog linkedin --help"
+        ),
+    )
     parser.add_argument("input_path", type=Path)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(command_args)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     settings = load_settings(Path.cwd())

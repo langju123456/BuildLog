@@ -21,6 +21,7 @@ from buildlog.planner import create_plan
 from buildlog.preprocessor import normalize_iteration
 from buildlog.prompt_loader import inspect_prompt_files
 from buildlog.repository import BuildLogRepository
+from buildlog.review_policy import HUMAN_REVIEW_WARNING
 from buildlog.reviser import revise_draft
 from buildlog.run_persistence import (
     create_run_record,
@@ -32,12 +33,6 @@ from buildlog.trace import RunTrace, create_run_trace
 from buildlog.writer import write_draft
 
 LOGGER = logging.getLogger(__name__)
-HUMAN_REVIEW_WARNING = (
-    "\n\n---\n\n"
-    "Human review required before publishing: check for secrets, API keys, "
-    "employer-confidential information, customer data, private repository details, "
-    "and unpublished business information.\n"
-)
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -312,6 +313,31 @@ def test_sqlite_observability_failure_marks_partial_without_raising(
     assert observation.pipeline_status.value == "completed"
     assert observation.observability_status.value == "partial"
     assert "SQLite observability projection failed" in observation.observability_issues[0]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symlink semantics")
+def test_event_writer_initialization_failure_does_not_block_pipeline(
+    tmp_path: Path,
+) -> None:
+    run_dir = _run_dir(tmp_path, "run-events-unavailable")
+    outside = tmp_path / "outside-events.jsonl"
+    outside.write_text("unchanged\n", encoding="utf-8")
+    (run_dir / "events.jsonl").symlink_to(outside)
+
+    observer = RunObserver(
+        "run-events-unavailable",
+        run_dir,
+        _settings(tmp_path),
+        tmp_path,
+    )
+    observation = observer.complete_pipeline(False)
+
+    assert observation.pipeline_status.value == "completed"
+    assert observation.observability_status.value == "partial"
+    assert "event writer initialization failed" in (
+        observation.observability_issues[0]
+    )
+    assert outside.read_text(encoding="utf-8") == "unchanged\n"
 
 
 def _settings(tmp_path: Path):
