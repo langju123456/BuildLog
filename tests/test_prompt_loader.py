@@ -28,3 +28,18 @@ def test_load_and_inspect_prompt_version(tmp_path: Path) -> None:
 def test_reject_invalid_prompt_version(tmp_path: Path) -> None:
     with pytest.raises(PromptFileError, match="invalid prompt version"):
         inspect_prompt_files(tmp_path, "../v2")
+
+
+def test_load_optional_asset_planner_without_changing_pipeline_prompt_set(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "asset_planner_v1.md").write_text(
+        "asset planner prompt",
+        encoding="utf-8",
+    )
+
+    assert (
+        load_prompt(tmp_path, "asset_planner", "v1")
+        == "asset planner prompt"
+    )
+    assert "asset_planner" not in PROMPT_NAMES

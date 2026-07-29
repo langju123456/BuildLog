@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-v0.2-2563eb)](PROJECT.md)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-218%20passed-2ea44f)](tests)
+[![Tests](https://img.shields.io/badge/tests-passing-2ea44f)](tests)
 [![LLM](https://img.shields.io/badge/LLM-local%20via%20Ollama-black?logo=ollama&logoColor=white)](https://ollama.com/)
 
 **BuildLog is an AI engineering communication engine that transforms real
@@ -49,6 +49,9 @@ Its current business capabilities are:
 - **Human-controlled LinkedIn publishing:** authenticates one local LinkedIn
   member, previews the exact final artifact, blocks duplicate posts, requires
   explicit approval, and stores a safe publication receipt.
+- **Reviewable publishing packages:** turns one reviewed run into a local
+  LinkedIn-ready caption, grounded card plan, deterministic PNG cards, alt
+  text, and a versioned manifest without publishing them.
 
 The current product is not a general content generator. It follows this path:
 
@@ -142,11 +145,16 @@ Currently included:
 - Exact final-artifact preview and explicit publication approval
 - Text-only personal LinkedIn publishing through a replaceable adapter
 - Duplicate protection, safe receipts, and append-only publication events
+- Local LinkedIn-targeted publishing packages built from reviewed runs
+- Validated, grounded card specifications and deterministic 1080x1350 PNGs
+- A package manifest with source, prompt, model, caption, and asset hashes
 
 Not included:
 
 - Automatic, scheduled, or background publishing
-- LinkedIn media posts, company-page publishing, analytics, or deletion
+- Automatic LinkedIn media upload, company-page publishing, analytics, or
+  deletion
+- Image-generation APIs, dynamic template systems, or multi-platform packages
 - Automatic GitHub, commit, issue, or diff collection
 - Web UI, API, accounts, or cloud deployment
 - RAG, vector search, or long-term memory
@@ -225,6 +233,20 @@ artifacts are written under `runs/`; structured metadata is stored in
 Use `BUILDLOG_MODEL_DIGEST` when an immutable local model digest is available.
 Without it, generation still works, but BuildLog honestly marks the replay
 manifest as partial.
+
+## Build a Publishing Package
+
+After reviewing a completed run, build a local LinkedIn-ready package:
+
+```bash
+.venv/bin/buildlog package build <run-id> --confirm-reviewed
+```
+
+BuildLog writes `caption.md`, `manifest.json`, and three or four ordered PNG
+cards under `.buildlog/publishing_packages/<package-id>/`. The manifest records
+the package lineage, planner provenance, card specifications, alt text, and
+content hashes. Package generation does not call LinkedIn or any other
+publishing API; review and upload remain manual in this baseline.
 
 ## Publish to LinkedIn
 

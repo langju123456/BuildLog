@@ -10,6 +10,7 @@ from pathlib import Path
 from buildlog.config import load_settings
 from buildlog.exceptions import BuildLogError
 from buildlog.linkedin_cli import linkedin_main
+from buildlog.package_cli import package_main
 from buildlog.pipeline import run_pipeline
 from buildlog.sqlalchemy_repository import SQLAlchemyRunRepository
 
@@ -19,12 +20,15 @@ def main(argv: list[str] | None = None) -> int:
     command_args = list(argv) if argv is not None else sys.argv[1:]
     if command_args and command_args[0] == "linkedin":
         return linkedin_main(command_args[1:])
+    if command_args and command_args[0] == "package":
+        return package_main(command_args[1:])
 
     parser = argparse.ArgumentParser(
         description="Generate a LinkedIn draft from one iteration JSON file.",
         epilog=(
             "LinkedIn authentication and publishing: "
-            "buildlog linkedin --help"
+            "buildlog linkedin --help. Local publishing packages: "
+            "buildlog package --help"
         ),
     )
     parser.add_argument("input_path", type=Path)

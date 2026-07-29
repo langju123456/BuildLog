@@ -10,6 +10,7 @@ from buildlog.exceptions import PromptFileError
 from buildlog.hashing import sha256_file
 
 PROMPT_NAMES = ("planner", "writer", "evaluator", "reviser")
+OPTIONAL_PROMPT_NAMES = ("asset_planner",)
 PROMPT_VERSION_PATTERN = re.compile(r"v[1-9][0-9]*")
 
 
@@ -46,7 +47,7 @@ def inspect_prompt_files(prompts_dir: Path, version: str) -> dict[str, PromptFil
 
 
 def _prompt_path(prompts_dir: Path, name: str, version: str) -> Path:
-    if name not in PROMPT_NAMES:
+    if name not in (*PROMPT_NAMES, *OPTIONAL_PROMPT_NAMES):
         raise PromptFileError(f"unknown prompt name: {name}")
     if PROMPT_VERSION_PATTERN.fullmatch(version) is None:
         raise PromptFileError(f"invalid prompt version: {version}")

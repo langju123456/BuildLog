@@ -27,3 +27,7 @@ class PersistenceError(BuildLogError):
 
 class PromptFileError(BuildLogError):
     """Raised when a versioned prompt file cannot be loaded."""
+
+
+class PackageBuildError(BuildLogError):
+    """Raised when a publishing package cannot be planned or rendered."""
