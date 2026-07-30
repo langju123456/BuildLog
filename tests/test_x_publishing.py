@@ -135,6 +135,7 @@ def test_x_settings_use_only_official_endpoints() -> None:
     assert settings.authorization_url == "https://x.com/i/oauth2/authorize"
     assert settings.token_url == "https://api.x.com/2/oauth2/token"
     assert settings.posts_url == "https://api.x.com/2/tweets"
+    assert settings.redirect_uri == "http://127.0.0.1:8766/auth/x/callback"
     assert settings.scopes == ("tweet.read", "tweet.write", "users.read")
 
 

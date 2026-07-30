@@ -2,66 +2,49 @@
 
 ## Objective
 
-Establish the BuildLog v0.2 LinkedIn Publishing Baseline.
+Close the BuildLog v0.2 X Publisher Validation Baseline.
 
-Make one existing reviewed BuildLog final artifact publishable as a text-only
-personal LinkedIn post through a secure, observable, testable, and explicitly
-human-controlled downstream workflow.
+Validate that the existing human-controlled Publisher Boundary can authenticate
+a real X account and deliver one explicitly approved, text-only smoke post
+without changing generation or Publishing Package behavior.
 
 ## Current Task
 
-- [x] Assess the existing repository and preserve generation boundaries
-- [x] Research LinkedIn scopes, OAuth, identity, endpoint, headers, and token
-  behavior from official documentation
-- [x] Record the publishing architecture decision
-- [x] Add isolated LinkedIn configuration and secret redaction
-- [x] Implement Authorization Code flow with one-time CSRF state and localhost
-  callback
-- [x] Store tokens atomically in a restricted user-level credential directory
-- [x] Add safe status, whoami, and logout behavior
-- [x] Resolve only an intact completed final artifact under the configured
-  runs directory
-- [x] Add a minimal publisher boundary and LinkedIn text-post adapter
-- [x] Add exact preview and explicit human approval
-- [x] Block duplicate successful publication by default
-- [x] Persist successful, failed, and indeterminate publication receipts
-- [x] Append safe publication events to the existing run event stream
-- [x] Add mocked OAuth, identity, HTTP, publishing, persistence, and CLI tests
-- [x] Document setup, security, and the manual production smoke test
-- [x] Complete real OAuth and one explicitly approved controlled publication
-  smoke test
+- [x] Preserve the shared preview, approval, duplicate, receipt, and
+  indeterminate-result workflow
+- [x] Add an isolated OAuth 2.0 PKCE X adapter
+- [x] Configure a Native App with read and write permission
+- [x] Complete real OAuth through the local loopback callback
+- [x] Verify the authenticated account through `GET /2/users/me`
+- [x] Create a dedicated `BL-X-SMOKE-001` local artifact
+- [x] Confirm no successful or indeterminate duplicate
+- [x] Obtain separate human approval for the exact payload
+- [x] Make one client-side POST attempt with no automatic retry
+- [x] Persist the successful HTTP 201 receipt and append-only events
+- [x] Record the phase boundary and freeze further delivery expansion
 
 ## Definition of Done
 
-- [x] Existing pipeline prompts, thresholds, LLM calls, and artifact names are
-  unchanged
-- [x] Legacy generation CLI behavior remains valid
-- [x] Tests run without LinkedIn credentials or network access
-- [x] `.env` and local credentials remain outside Git
-- [x] No token, secret, authorization code, ID token, full post, or
-  Authorization header enters receipts or events
-- [x] OIDC userinfo resolves the authenticated member without trusting an
-  unverified JWT
-- [x] Preview displays the complete exact post and never submits it
-- [x] Publication requires `--confirm` and exact interactive `PUBLISH`
-- [x] A prior successful platform/account/content hash blocks duplicates
-- [x] Ambiguous post outcomes are indeterminate and block blind retries
-- [x] Publication failure does not change completed generation status
-- [x] Receipt persistence and append-only event sequencing are test-covered
-- [x] Real OAuth and the first real post required separate explicit human
-  approval
-- [x] Full tests, compile check, and `git diff --check` pass
+- [x] Real OAuth 2.0 PKCE authentication succeeds
+- [x] The expected X account is resolved from the official identity endpoint
+- [x] Preview performs no publication request
+- [x] Publication requires exact interactive `PUBLISH` confirmation
+- [x] The smoke test uses a unique Test ID and dedicated local artifact
+- [x] Exactly one client-side POST attempt is made
+- [x] Automatic publication retries remain disabled
+- [x] A successful local receipt records HTTP status and external post ID
+- [x] Tokens, `.env`, database state, runs, and smoke artifacts remain outside
+  Git
+- [x] No LinkedIn, generation, prompt, evaluator, or Publishing Package
+  behavior changes
 
 ## Out of Scope
 
-- Automatic, scheduled, background, or retry-queue publishing
-- Media, article, document, carousel, or video posts
-- Organization-page publishing
-- Comments, likes, analytics, deletion, or post management
-- Multi-user, multi-account, cloud-token, or web UI support
-- Advertising, Lead Sync, Verified, or data-portability products
-- MCP or tool-calling integration
-- Other social platforms
-- Prompt, evaluator, threshold, model, or generation behavior changes
-- RAG, embeddings, retrieval, memory, or multimodal baselines
-- Unapproved or autonomous real publication
+- Additional social platform adapters
+- Automatic, scheduled, or background publishing
+- Threads, replies, media, direct messages, analytics, or post management
+- Token refresh or hosted OAuth infrastructure
+- Channel-specific content generation
+- Publishing Package support for X
+- Evidence Capture, RAG, retrieval, knowledge graphs, or agent frameworks
+- Exactly-once server-side delivery guarantees

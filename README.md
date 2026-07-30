@@ -5,11 +5,11 @@
 [![Tests](https://img.shields.io/badge/tests-passing-2ea44f)](tests)
 [![LLM](https://img.shields.io/badge/LLM-local%20via%20Ollama-black?logo=ollama&logoColor=white)](https://ollama.com/)
 
-**BuildLog is an AI engineering communication engine that transforms real
-software development work into evidence-grounded, reviewable, and traceable
-technical content.**
+**BuildLog is an evidence-aware engineering publishing workflow that
+transforms real software development work into reviewable technical stories,
+publishing assets, and optional human-controlled delivery.**
 
-Evidence in. Reviewable engineering artifacts out.
+Evidence in. Engineering story out. Delivery remains optional.
 
 ## The Problem
 
@@ -25,8 +25,8 @@ story with weak grounding.
 ## 🧩 Product Capabilities
 
 BuildLog is an evidence-to-artifact AI engineering workflow. In v0.2, it
-proves this workflow with reviewed technical content, local publishing
-packages, and human-controlled text adapters for LinkedIn and X.
+combines reviewed technical content, a local LinkedIn-targeted Publishing
+Package, and optional human-controlled text delivery to LinkedIn and X.
 
 Its current business capabilities are:
 
@@ -48,21 +48,32 @@ Its current business capabilities are:
   code state as far as practical.
 - **Human-controlled social publishing:** authenticates one local account,
   previews the exact final artifact, blocks duplicate posts, requires explicit
-  approval, and stores a safe publication receipt. LinkedIn has been validated
-  live; X is implemented and awaiting manual OAuth validation.
+  approval, and stores a safe publication receipt. LinkedIn and X have both
+  completed real OAuth, identity, and controlled text-publication validation.
 - **Reviewable publishing packages:** turns one reviewed run into a local
   LinkedIn-ready caption, grounded card plan, deterministic PNG cards, alt
   text, and a versioned manifest without publishing them.
 
-The current product is not a general content generator. It follows this path:
+The current product is not a generic content generator or a social-media
+automation suite. Its product boundary is:
 
 ```text
-Engineering evidence
+User-supplied engineering evidence
     ↓
-Engineering narrative
+Reviewed engineering story
     ↓
-Engineering communication
+Publishing artifact or package
+    ↓
+Human review
+    ↓
+Manual use or explicitly approved delivery
 ```
+
+BuildLog owns the evidence-aware transformation and review workflow. Platform
+adapters own only final transport. The current generated story and Publishing
+Package are LinkedIn-oriented; genuinely distinct channel-specific LinkedIn
+and X artifacts are the next product validation question, not an implemented
+claim.
 
 ## 🛡️ Why Trust It
 
@@ -106,7 +117,10 @@ flowchart LR
     E -->|"Yes"| F["One constrained revision"]
     F --> G
     G --> H["Human review"]
-    H --> I["Explicitly approved destination"]
+    H --> I["Publishing artifact or package"]
+    I --> J{"Delivery choice"}
+    J -->|"Manual"| K["Copy or upload"]
+    J -->|"Approved adapter"| L["LinkedIn or X transport"]
 ```
 
 Deterministic code handles validation, normalization, thresholds, persistence,
@@ -163,6 +177,7 @@ Not included:
 - RAG, vector search, or long-term memory
 - Resume, ADR, weekly-report, or PR-description generation
 - A guarantee that generated text is publishable without human editing
+- Distinct channel-specific LinkedIn and X content strategies or artifacts
 
 ## 🤖 Skills Demonstrated
 
@@ -185,7 +200,7 @@ must improve the product while proving a concrete engineering capability.
 | Embeddings and vector search | Planned |
 | Retrieval and memory | Planned |
 | Multimodal communication | Planned |
-| Human-controlled LinkedIn publishing | Demonstrated through OAuth, preview, approval, duplicate protection, receipts, and mocked API tests |
+| Human-controlled delivery | Demonstrated through real LinkedIn and X OAuth, identity, preview, approval, duplicate protection, and receipts |
 | Workflow automation | Planned |
 
 ## See a Real Example
@@ -305,8 +320,14 @@ standard text post of at most 280 weighted characters.
 
 Preview never publishes. The final command requires typing `PUBLISH`, makes
 one `POST /2/tweets` request, and never retries automatically. X OAuth and
-live publishing remain pending manual validation; see the
+live publishing use OAuth 2.0 PKCE with a local callback; see the
 [X setup guide](docs/x/setup.md).
+
+> Live validation status: real OAuth, verified identity resolution through
+> `GET /2/users/me`, and one controlled public text smoke test completed
+> successfully on 2026-07-30 with HTTP 201 and a persisted receipt. This
+> validates one client-side publication attempt, not exactly-once delivery by
+> X.
 
 ## Learn More
 
@@ -325,6 +346,8 @@ live publishing remain pending manual validation; see the
   endpoint, scope, identity, and smoke-test evidence
 - [LinkedIn Publishing ADR](docs/adr/ADR-linkedin-publishing-baseline.md):
   architecture and safety decisions
+- [X Publisher Phase Review](docs/x/phase-review.md): verified capability,
+  limits, and the decision to freeze delivery expansion
 
 BuildLog is not a LinkedIn generator with extra logging. It is a small,
 inspectable AI engineering workflow for turning real development evidence into

@@ -10,13 +10,17 @@
 
 **Current version:** v0.2
 
-**Project type:** AI engineering communication engine
+**Project type:** Evidence-aware engineering publishing workflow
 
-**Current output:** LinkedIn post draft with optional, explicitly approved
-personal-member publishing
+**Current outputs:** A reviewed LinkedIn-oriented final draft, an optional
+local LinkedIn-targeted Publishing Package, and optional explicitly approved
+text delivery through validated LinkedIn and X adapters
 
-**Long-term product category:** Engineering communication and knowledge
-platform
+**Near-term product direction:** Channel-specific engineering content
+transformation
+
+**Long-term product category:** Personal work intelligence and content
+production system
 
 **Primary user:** A developer who wants to convert real development work into accurate, reusable technical content
 
@@ -40,12 +44,15 @@ Most of this disappears after the code works.
 
 Git records what changed, but it rarely preserves why the change mattered, what alternatives were considered, what failed, or what the developer learned.
 
-BuildLog captures one real development iteration and transforms it into structured, evidence-grounded technical communication.
+BuildLog accepts one real development iteration and transforms it into
+structured, evidence-grounded technical communication.
 
-BuildLog is not primarily a LinkedIn generator. LinkedIn is the first v0.1
-output format. The broader product is an AI engineering communication engine
-that transforms engineering evidence into reviewable, traceable, and reusable
-technical artifacts.
+BuildLog is not primarily a LinkedIn generator or a multi-platform posting
+tool. LinkedIn is the first generation format and the first visual Publishing
+Package target. LinkedIn and X delivery adapters are optional last-mile
+transport. The broader product owns the evidence-aware workflow that turns
+engineering work into reviewable, traceable, reusable, and eventually
+channel-specific artifacts.
 
 The long-term goal is not content generation for its own sake.
 
@@ -105,15 +112,43 @@ A user can provide evidence from a real development iteration, run the pipeline,
 
 ---
 
-### v0.2 publishing goal
+### v0.2 product goal
 
-BuildLog v0.2 adds one downstream destination capability:
+BuildLog v0.2 validates three connected but separate capabilities:
 
-> Publish an existing reviewed final artifact as one text-only personal
-> LinkedIn post only after exact human preview and explicit approval.
+1. Generate and review an evidence-grounded engineering story.
+2. Build one local LinkedIn-targeted visual Publishing Package from a reviewed
+   run.
+3. Optionally deliver an existing reviewed text artifact through a
+   human-controlled LinkedIn or X adapter.
 
-Publishing does not change generation, evaluation, revision, prompts, or the
-final artifact contract. It is a separate operation after a completed run.
+Publishing is not required to receive product value. Manual copy or upload
+remains a valid endpoint. Delivery does not change generation, evaluation,
+revision, prompts, the final artifact contract, or Publishing Package
+construction.
+
+The current story generation and Publishing Package are LinkedIn-oriented. X
+delivery is technically validated, but distinct X content generation is not
+yet implemented. The next product validation is whether the same reviewed
+engineering evidence can produce genuinely different LinkedIn and X artifacts
+that require little human editing.
+
+### Current product contract
+
+```text
+User-supplied engineering evidence
+        ↓
+Reviewed engineering story
+        ↓
+Target-aware publishing artifact or package
+        ↓
+Human review
+        ↓
+Manual use or optional approved delivery
+```
+
+BuildLog owns evidence, knowledge transformation, channel-specific artifacts,
+and human review. Delivery adapters own only final transport.
 
 ---
 
@@ -145,10 +180,10 @@ The following were explicitly outside the v0.1 generation baseline:
 - article generation
 - content scheduling
 
-v0.2 intentionally implements the narrowly scoped LinkedIn authentication and
-human-controlled publishing items. The remaining items are still out of scope.
-There is no automatic, scheduled, background, organization-page, or media
-publishing.
+v0.2 intentionally implements narrowly scoped LinkedIn and X authentication
+and human-controlled text publishing. The remaining items are still out of
+scope. There is no automatic, scheduled, background, organization-page,
+thread, or media publishing.
 
 ---
 
@@ -280,6 +315,9 @@ Completed or current baselines:
 - Example Showcase
 - Agent Observability Baseline
 - LinkedIn Publishing Baseline (implemented early in v0.2)
+- Publishing Package Baseline
+- X Publisher Implementation Baseline
+- X Publisher Validation Baseline
 
 Planned capability baselines:
 
@@ -291,8 +329,7 @@ Planned capability baselines:
 - Engineering Memory Baseline
 - Multimodal Communication Baseline
 - Workflow Automation Baseline
-- Publishing Baseline (conceptual roadmap position retained; first vertical
-  slice implemented early in v0.2)
+- Channel-Specific Content Validation
 
 Each planned baseline is out of scope unless explicitly moved into
 the current task file.
@@ -502,14 +539,16 @@ Optional structured context such as:
 3. Pydantic validates the schema.
 4. Deterministic preprocessing normalizes the input.
 5. The planner selects the central story.
-6. The writer creates the first LinkedIn draft.
+6. The writer creates the first LinkedIn-oriented draft.
 7. The evaluator scores the draft.
 8. Code compares scores with fixed thresholds.
 9. If required, the reviser performs one revision.
 10. The system stores all artifacts.
 11. The final Markdown draft is returned for human review.
-12. In v0.2, a separate command may resolve that existing final artifact,
-    preview it, require exact human approval, and publish it to LinkedIn.
+12. In v0.2, the user may build a local LinkedIn-targeted Publishing Package.
+13. Separately, the user may resolve the existing final text artifact, preview
+    it, require exact human approval, and deliver it through LinkedIn or X.
+14. Manual copy or upload remains a valid endpoint; delivery is optional.
 ```
 
 ### 9.2 Revision rule
@@ -619,13 +658,22 @@ resolver removes only this exact fixed warning from the network post body.
                │
                ▼
 ┌─────────────────────────────┐
-│ Human Preview + Approval    │  Deterministic, downstream
+│ Human Review                │  Product authority
 └──────────────┬──────────────┘
                │
-               ▼
-┌─────────────────────────────┐
-│ LinkedIn Publisher Adapter  │  External I/O, v0.2
-└─────────────────────────────┘
+        ┌──────┴────────┐
+        │               │
+        ▼               ▼
+┌─────────────────┐  ┌─────────────────────┐
+│ Package Builder │  │ PublishingService   │  Optional delivery
+└────────┬────────┘  └──────────┬──────────┘
+         │                       │
+         ▼                 ┌─────┴─────┐
+┌─────────────────┐        ▼           ▼
+│ LinkedIn-ready  │   ┌──────────┐ ┌──────────┐
+│ local package   │   │ LinkedIn │ │ X text   │
+└─────────────────┘   │ adapter  │ │ adapter  │
+                      └──────────┘ └──────────┘
 ```
 
 ---
@@ -1383,7 +1431,7 @@ Defines project-specific exceptions such as:
 - `StructuredOutputError`
 - `TraceWriteError`
 
-### LinkedIn publishing modules
+### Publishing modules
 
 - `review_policy.py` owns the exact cross-stage human-review warning without
   coupling generation to publishing.
@@ -1413,6 +1461,15 @@ Defines project-specific exceptions such as:
   bodies or credentials.
 - `linkedin_cli.py` exposes the local login, status, whoami, preview, publish,
   and logout flow.
+- `x_config.py`, `x_oauth.py`, `x_callback.py`, `x_token_store.py`, and
+  `x_identity.py` implement the isolated OAuth 2.0 PKCE and verified identity
+  boundary for X.
+- `x_publisher.py` is the text-only `POST /2/tweets` adapter.
+- `x_cli.py` exposes X login, status, whoami, preview, publish, and logout
+  without introducing a second publishing workflow.
+
+The Publishing Package is a separate output boundary. It is currently
+LinkedIn-targeted and is not consumed by the X adapter.
 
 ---
 
@@ -1592,6 +1649,21 @@ submission is recorded as `indeterminate`. A matching indeterminate receipt
 also blocks publication until the human inspects LinkedIn and explicitly
 overrides the block.
 
+X commands added in v0.2:
+
+```bash
+buildlog x login
+buildlog x status
+buildlog x whoami
+buildlog x preview <run-id>
+buildlog x publish <run-id> --confirm
+buildlog x logout
+```
+
+X follows the same preview, approval, duplicate, indeterminate-result, and
+receipt contract. Its adapter makes at most one client-side POST attempt and
+does not claim exactly-once server-side delivery.
+
 ---
 
 ## 20. Environment configuration
@@ -1615,6 +1687,8 @@ LINKEDIN_CLIENT_ID=
 LINKEDIN_CLIENT_SECRET=
 LINKEDIN_REDIRECT_URI=http://localhost:8765/auth/linkedin/callback
 LINKEDIN_API_VERSION=202607
+X_CLIENT_ID=
+X_REDIRECT_URI=http://127.0.0.1:8766/auth/x/callback
 ```
 
 No real secrets should be committed.
@@ -1656,7 +1730,7 @@ v0.1 is complete when:
 
 ---
 
-### Definition of done for the v0.2 publishing baseline
+### Definition of done for the v0.2 publishing and package baselines
 
 - [x] Existing generation behavior and artifacts remain unchanged.
 - [x] OAuth state is one-time, validated, and stored outside runs.
@@ -1672,41 +1746,47 @@ v0.1 is complete when:
 - [x] All automated network tests are mocked.
 - [x] Real OAuth and the first real post were completed only through separate,
       explicit human approval.
+- [x] The same Publisher Boundary is reused by LinkedIn and X.
+- [x] X OAuth 2.0 PKCE and identity resolution are validated against a real
+      account.
+- [x] One explicitly approved X smoke post returned HTTP 201 with a persisted
+      local receipt.
+- [x] One reviewed run can produce a local LinkedIn-targeted caption, card
+      assets, alt text, and manifest without publishing.
+- [x] Publishing Package construction remains separate from delivery.
 
 ---
 
 ## 22. Current implementation iteration
 
-### Objective
+### Completed objective
 
-Add the smallest secure and human-controlled downstream LinkedIn publishing
-capability for an existing reviewed BuildLog final artifact.
+Validate the reusable human-controlled Publisher Boundary through real
+LinkedIn and X text delivery while keeping transport downstream and optional.
 
 ### Required sequence
 
 ```text
-Research endpoint and identity contracts
+Reviewed final artifact
         ↓
-Record publishing ADR
+Exact preview
         ↓
-Implement OAuth and private token storage
+Explicit human approval
         ↓
-Resolve authenticated member
+One client-side publication attempt
         ↓
-Resolve existing final artifact
-        ↓
-Preview and explicit approval
-        ↓
-Duplicate protection
-        ↓
-LinkedIn text adapter
-        ↓
-Persist receipts and append safe events
-        ↓
-Run mocked integration tests
-        ↓
-Complete real OAuth and first post through explicit manual review
+Durable receipt and event trace
 ```
+
+LinkedIn and X have both completed this controlled real-world validation.
+Further delivery expansion is frozen.
+
+### Next product validation
+
+Determine whether the same reviewed engineering evidence can produce distinct
+LinkedIn and X artifacts that the user is willing to publish with low editing
+effort. This is a product validation question, not authorization to implement
+a template registry, scheduler, new publisher, or autonomous workflow.
 
 ### Freeze rule
 
@@ -1771,8 +1851,8 @@ When implementing this project:
 7. Create tests for deterministic business logic.
 8. Store every major pipeline artifact.
 9. Permit at most one automatic revision.
-10. Keep LinkedIn publishing downstream, text-only, personal-member,
-    human-controlled, and independent from generation.
+10. Keep delivery adapters downstream, text-only, human-controlled, optional,
+    and independent from generation and Publishing Package construction.
 11. Use only the specified SQLite persistence layer; do not introduce
     LangGraph, PostgreSQL, Redis, Celery, RAG, or a web UI in v0.1.
 12. Before making a significant architectural change, document the reason.

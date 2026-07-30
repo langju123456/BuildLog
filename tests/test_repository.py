@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -179,8 +179,8 @@ def test_publish_receipt_persistence_and_duplicate_query(tmp_path: Path) -> None
             "receipt_id": "receipt-002",
             "attempt_id": "attempt-002",
             "external_post_id": "urn:li:share:456",
-            "created_at": datetime(2026, 7, 30, tzinfo=UTC),
-            "published_at": datetime(2026, 7, 30, tzinfo=UTC),
+            "created_at": receipt.created_at + timedelta(seconds=1),
+            "published_at": receipt.created_at + timedelta(seconds=1),
         }
     )
     repository.save_publish_receipt(latest_receipt)

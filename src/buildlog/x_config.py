@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 from buildlog.x_errors import XConfigurationError
 
-DEFAULT_REDIRECT_URI = "http://localhost:8766/auth/x/callback"
+DEFAULT_REDIRECT_URI = "http://127.0.0.1:8766/auth/x/callback"
 DEFAULT_AUTHORIZATION_URL = "https://x.com/i/oauth2/authorize"
 DEFAULT_TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_API_BASE_URL = "https://api.x.com"
@@ -156,7 +156,7 @@ def _validate_redirect_uri(value: str) -> None:
         or parsed.fragment
     ):
         raise XConfigurationError(
-            "X_REDIRECT_URI must be an exact localhost HTTP callback URL with "
+            "X_REDIRECT_URI must be an exact loopback HTTP callback URL with "
             "an explicit port and no query or fragment."
         )
 

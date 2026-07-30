@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pydantic import SecretStr
@@ -318,7 +318,7 @@ def test_whoami_never_prints_token_or_raw_member_identity(
     )
     token = LinkedInToken(
         access_token=SecretStr("access-secret"),
-        expires_at=datetime(2026, 7, 30, tzinfo=UTC),
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
         scopes={"openid", "profile", "w_member_social"},
         scope_source="response",
         obtained_at=_now(),
