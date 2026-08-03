@@ -313,3 +313,30 @@ class PublishReceiptTable(Base):
         ForeignKey("publish_receipts.id"),
         nullable=True,
     )
+
+
+class WorkflowJobTable(Base):
+    """Durable request state for an asynchronously executed generation run."""
+
+    __tablename__ = "workflow_jobs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_workflow_job_idempotency_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), index=True)
+    input_hash: Mapped[str] = mapped_column(String(64), index=True)
+    input_json: Mapped[dict[str, Any]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    run_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    error_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    safe_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

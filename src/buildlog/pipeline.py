@@ -16,7 +16,7 @@ from buildlog.exceptions import PersistenceError
 from buildlog.input_loader import load_iteration
 from buildlog.llm_client import LLMClient
 from buildlog.observer import RunObserver
-from buildlog.observability_utils import SystemClock
+from buildlog.observability_utils import SystemClock, sanitized_error_message
 from buildlog.planner import create_plan
 from buildlog.preprocessor import normalize_iteration
 from buildlog.prompt_loader import inspect_prompt_files
@@ -319,7 +319,12 @@ def run_pipeline(
         observer.refresh_outputs()
     except Exception as exc:
         if run_saved:
-            _mark_run_failed(repository, run_id, exc)
+            _mark_run_failed(
+                repository,
+                run_id,
+                exc,
+                settings.prompts_dir.parent,
+            )
         observer.fail_pipeline(exc)
         _write_failed_metadata(trace, repository, observer, run_id, run_saved)
         raise
@@ -343,9 +348,14 @@ def _mark_run_failed(
     repository: BuildLogRepository,
     run_id: str,
     error: Exception,
+    project_root: Path,
 ) -> None:
     try:
-        repository.fail_run(run_id, str(error), datetime.now(UTC))
+        repository.fail_run(
+            run_id,
+            sanitized_error_message(error, project_root),
+            datetime.now(UTC),
+        )
     except PersistenceError:
         LOGGER.exception("could not mark failed run %s", run_id)
 

@@ -25,9 +25,23 @@ buildlog = "buildlog.main:main"
 dev = [
   "pytest>=8.0",
 ]
+web = [
+  "fastapi>=0.116,<1.0",
+  "prometheus-client>=0.22,<1.0",
+  "uvicorn[standard]>=0.35,<1.0",
+]
+cloud = [
+  "alembic>=1.16,<2.0",
+  "azure-identity>=1.23,<2.0",
+  "azure-storage-blob>=12.26,<13.0",
+  "psycopg[binary]>=3.2,<4.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+buildlog = ["web_static/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

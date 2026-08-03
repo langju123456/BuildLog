@@ -38,6 +38,7 @@ EXPECTED_TABLES = {
     "run_observations",
     "runs",
     "step_observations",
+    "workflow_jobs",
 }
 
 

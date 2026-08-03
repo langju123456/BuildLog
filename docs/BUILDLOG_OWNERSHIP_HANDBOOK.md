@@ -3,7 +3,7 @@
 > A developer ownership, interview preparation, and founder decision guide for
 > the current BuildLog repository.
 
-**Baseline:** `0247887` (`BuildLog v0.2 X Publisher Validation Baseline`)
+**Baseline:** hosted-product and Salesforce interview baseline, 2026-08-02.
 
 **Audience:** the repository owner first; reviewers, interviewers, and future
 contributors second.
@@ -102,13 +102,22 @@ The current repository can:
 - deliver text through validated LinkedIn and X adapters;
 - persist success, failure, or indeterminate publication receipts;
 - block known duplicate or unresolved publication attempts.
+- serve an authenticated internal dashboard and versioned REST API;
+- accept validated generation jobs with required idempotency keys;
+- persist, transactionally claim, retry, recover, and inspect workflow jobs;
+- run schema changes through Alembic against SQLite or PostgreSQL;
+- expose liveness, database readiness, request metrics, request IDs, and
+  security headers;
+- mirror completed run artifacts to Azure Blob Storage with content hashes;
+- build and deploy through a non-root container, Azure Bicep, and protected
+  GitHub Actions environments.
 
 It does **not** currently prove:
 
 - reliable automatic evidence collection;
 - stable channel-specific content quality across many real runs;
 - autonomous or scheduled publishing;
-- multi-user hosted authentication;
+- application-owned multi-user RBAC or tenant isolation;
 - server-side exactly-once delivery;
 - a reusable multi-platform Publishing Package contract;
 - product-market fit, retention, or willingness to pay.
@@ -117,9 +126,9 @@ It does **not** currently prove:
 
 | Level | Meaning | Current examples |
 |---|---|---|
-| Verified | Real code and evidence demonstrate the claim | Local Qwen pipeline, SQLite/filesystem trace, LinkedIn text smoke publish, X OAuth and text smoke publish |
-| Implemented but not broadly validated | Code exists; product value or generality is not proven | LinkedIn visual package, shared publisher workflow |
-| Feasible | A credible implementation path exists | Hosted OAuth broker, additional publisher adapters |
+| Verified | Real code and evidence demonstrate the claim | Local Qwen pipeline, SQLite/filesystem trace, LinkedIn and X HTTP 201 smoke publishes, 270 automated tests, 500-request in-process API benchmark |
+| Implemented but not broadly validated | Code exists; product value, hosted operation, or generality is not proven | FastAPI dashboard, durable SQL jobs, Alembic, container, Azure IaC, Blob mirroring, shared publisher workflow |
+| Feasible | A credible implementation path exists | Hosted Azure smoke validation, multi-replica worker deployment, additional publisher adapters |
 | Aspirational | Product direction, not a present capability | automatic evidence capture, cross-channel content engine, work-intelligence platform |
 
 An interview answer must preserve these distinctions. Strong engineers reduce
@@ -158,7 +167,16 @@ Decision rule:
 
 ```mermaid
 flowchart TD
-    U[User / CLI] --> C[CLI Commands]
+    U[User / Browser] --> W[FastAPI and Static Dashboard]
+    A[Automation Client] --> W
+    CO[Owner / CLI] --> C[CLI Commands]
+
+    W --> AU[API Key or Trusted Entra Header]
+    AU --> RL[Rate Limit and Request Telemetry]
+    RL --> WR[Web Repository]
+    WR --> J[(Workflow Jobs)]
+    J --> WK[Durable Worker]
+    WK --> G[Generation Pipeline]
 
     C --> G[Generation Pipeline]
     C --> K[Package Builder]
@@ -168,7 +186,7 @@ flowchart TD
     G --> D[Domain and Pydantic Contracts]
     G --> M[LLM Stages]
     G --> R[Run Repository]
-    G --> O[Observability]
+    G --> OBS[Observability]
 
     K --> AP[Asset Planner]
     K --> CR[Deterministic Card Renderer]
@@ -184,10 +202,13 @@ flowchart TD
     PA --> XI[X API]
 
     R --> FS[Filesystem Artifacts]
-    R --> DB[(SQLite Metadata)]
+    R --> DB[(SQLite or PostgreSQL Metadata)]
     PR --> DB
-    O --> FS
-    O --> DB
+    OBS --> FS
+    OBS --> DB
+    WR --> DB
+    WK --> BS[Azure Blob Artifact Mirror]
+    W --> PM[Prometheus Metrics]
 ```
 
 ## 7. Layer Responsibilities
@@ -203,6 +224,9 @@ flowchart TD
 | Package building | reviewed-run resolution, planning, rendering, manifest integrity | publishing or account authentication |
 | Authentication adapters | user authorization, token storage, identity resolution | content generation |
 | Publisher adapters | one platform transport attempt and response parsing | rewriting, retry policy, approval decisions |
+| Web/API | HTTP contracts, authentication gate, validation, request telemetry, health endpoints | LLM reasoning, platform transport |
+| Durable worker | job claim, bounded retry, stale recovery, pipeline invocation, artifact mirroring | changing the generation graph |
+| Deployment | immutable image, configuration, migrations, probes, managed-service wiring, rollback | product policy or fabricated reliability claims |
 
 ## 8. Stable Vocabulary
 
@@ -232,6 +256,9 @@ flowchart TD
 src/buildlog/       product code
 prompts/            versioned external prompt files
 tests/              deterministic, integration-style, and adapter tests
+migrations/         Alembic schema history
+infra/azure/        Azure Container Apps, PostgreSQL, Blob, and operations IaC
+.github/workflows/  CI and protected Azure deployment workflows
 examples/           committed sample iteration inputs
 examples/outputs/   selected public showcase outputs
 docs/               decisions, baselines, setup, and this handbook
@@ -248,6 +275,9 @@ The filesystem and SQLite have different jobs:
   and publication receipts.
 
 This hybrid decision preserves inspection without giving up relational queries.
+In the hosted path, PostgreSQL is the shared metadata and job-control plane;
+Blob Storage is an optional durable artifact mirror. SQLite remains the fast
+local development path.
 
 ---
 
@@ -642,11 +672,19 @@ metadata is valuable for identity, lineage, duplicate queries, and receipts.
 Putting every payload in SQL would reduce inspectability; using files alone made
 relationships and queries fragile.
 
-### Why no queue, Redis, Celery, or event bus?
+### Why a database queue instead of Redis, Celery, or an event bus?
 
-The current product is a local, single-user workflow without measured throughput
-or availability pressure. Adding distributed infrastructure would create
-deployment and failure complexity without solving the present user bottleneck.
+The hosted product now needs API requests to return before long LLM generation
+finishes, and interrupted work must survive process restarts. A `workflow_jobs`
+table supplies durable state, idempotency, bounded attempts, stale recovery, and
+transactional claims without introducing a second operational datastore. On
+PostgreSQL, claims use row locking so consumers do not take the same job.
+
+This is deliberately not the final high-scale queue. Move to a managed broker
+or Celery-style worker system when independent worker autoscaling, queue
+priorities, long visibility timeouts, global backpressure, or dead-letter
+operations are measured requirements. Before multiple web replicas, also move
+migrations to a deployment job and rate limiting to a shared gateway or store.
 
 ### Why no LangGraph or generic agent framework?
 
@@ -689,6 +727,10 @@ comparison easier before image-generation quality or cost was proven necessary.
 - Observability is cross-cutting and best-effort.
 - External publication is human-controlled and auditable.
 - LinkedIn and X demonstrate adapter reuse without claiming package reuse.
+- API intake, durable execution, and the existing LLM pipeline remain separate
+  boundaries.
+- Schema history, container delivery, cloud wiring, and operations are explicit
+  repository artifacts rather than resume-only claims.
 - Tests exercise failure semantics, not only happy paths.
 - Git history records the architecture's evolution and rejected directions.
 
@@ -702,7 +744,10 @@ These are review findings, not automatic refactor tasks.
 | X adapter imports some LinkedIn-defined shared errors | naming obscures ownership | same trigger as above |
 | `RunObserver` is large and coordinates many telemetry concerns | harder local reasoning and testing | a new observation type causes repeated changes or defects |
 | `PublishingService` is large | workflow and failure semantics are dense | changes repeatedly touch unrelated branches |
-| SQLite schema uses `create_all` and no migrations | unsafe evolution once persisted data matters across versions | first hosted/user-data deployment or schema-changing release |
+| development mode can still use `create_all` while hosted mode requires Alembic | bypassing migration mode could create schema drift | any shared or hosted database |
+| web worker and API share one process and one replica | long LLM work competes with web lifecycle and cannot scale independently | hosted concurrency, deploy interruption, or queue-age SLO requires separation |
+| rate limiting is process-local | limits are not global across replicas | before increasing `maxReplicas` above one |
+| database and Blob writes are not atomic | metadata can complete before artifact mirroring is durable | hosted mirror failure or recovery requirement |
 | LinkedIn OIDC `sub` author mapping is inferred | documentation confidence is weaker than runtime proof | broader user rollout or provider clarification |
 | package review confirmation is not a durable reviewer identity/time state | audit meaning is limited | real package-review workflow becomes a user bottleneck |
 | X receives generic final text, not an X-specific artifact | delivery is proven; channel value is not | channel-specific content validation sprint |
@@ -864,7 +909,9 @@ Partly.
 The interviewer asks about your real system:
 
 - Why SQLite?
-- Why no queue?
+- Why a database queue before Redis or a managed broker?
+- Why keep one replica in the initial Azure template?
+- Which claim cannot be made until the hosted smoke test succeeds?
 - Why no retry?
 - How would this support 100,000 users?
 - What would you change first?
@@ -1190,9 +1237,392 @@ evidence, and the architecture changed only where the evidence required it.
 
 ---
 
-# Part XII. Ownership Passes
+# Part XII. Hosted Product, Cloud, and System-Design Transfer
 
-## 43. Definition of Done for Every Pass
+## 43. Hosted Request and Job Lifecycles
+
+Read path:
+
+```text
+Browser or API client
+  -> request ID, rate limit, and security headers
+  -> API-key or trusted Azure identity gate
+  -> FastAPI route and response contract
+  -> SQLAlchemy web repository
+  -> SQLite locally or PostgreSQL when hosted
+  -> JSON response and dashboard rendering
+```
+
+Generation path:
+
+```text
+POST /api/v1/jobs + Idempotency-Key
+  -> Pydantic Iteration validation
+  -> unique idempotency key + input hash check
+  -> queued workflow_jobs row
+  -> worker transactionally claims one job
+  -> existing bounded LLM pipeline
+  -> filesystem run + relational observations
+  -> optional hash-addressed Azure Blob mirror
+  -> completed, retryable, or terminal job state
+```
+
+Ownership checks:
+
+- A repeated key with identical input returns the original job; the same key
+  with different input returns a conflict.
+- API handlers doing blocking SQL work run in FastAPI's thread pool.
+- A worker records a sanitized category and message rather than exposing
+  secrets from an arbitrary exception.
+- Attempts are bounded. Stale running jobs are recovered after a configured
+  timeout instead of remaining invisible forever.
+- Job completion is not exactly-once LLM execution. It is durable,
+  idempotent intake plus at-least-once-capable recovery with bounded attempts.
+- Blob mirroring is downstream of the local run; a database and object-store
+  transaction are not atomic. Alerting and reconciliation remain necessary.
+
+## 44. Production Capability Evidence
+
+| Claim | Current evidence | What remains before a stronger claim |
+|---|---|---|
+| Full-stack internal AI product | FastAPI REST API, static JavaScript dashboard, validated workflow form, run/job views | usability feedback from target users |
+| Durable asynchronous workflow | persisted jobs, unique idempotency key, transactional claim, retry bound, stale recovery, worker tests | long-running hosted soak test and operational job dashboard alerts |
+| Relational production path | PostgreSQL-compatible SQLAlchemy code and Alembic migration | migration and rollback smoke test against the deployed managed database |
+| Cloud-ready delivery | non-root Dockerfile, Compose, Azure Bicep, OIDC GitHub Actions, probes, runbook | build/push/deploy and end-to-end hosted smoke test |
+| Observability | request IDs, structured logs, Prometheus HTTP metrics, readiness, run/LLM trace, dashboard aggregates | hosted dashboards, alert firing test, retention validation |
+| Performance baseline | 500 successful in-process ASGI dashboard reads, 34.56 ms p95 | network/container/load-balanced benchmark with realistic data and write mix |
+| External integration | controlled LinkedIn and X OAuth plus HTTP 201 publications | sustained use, refresh/revocation drills, provider failure exercises |
+| Quality/reliability | 270 automated tests; 8 evaluated runs averaging 8.97/10 | larger human-reviewed corpus and user outcome measurements |
+
+Never convert repository counts into customer scale. Never convert an
+in-process benchmark into production latency. Never say "deployed to Azure"
+until a hosted smoke record exists.
+
+## 45. Cloud Ownership: L1 Through L4
+
+| Level | BuildLog proof | Status |
+|---|---|---|
+| L1: deployable application | production entry point, non-root image, health endpoints, immutable image workflow | implemented; hosted execution pending |
+| L2: managed environment | Container Apps, HTTPS platform boundary, secrets, managed PostgreSQL, Blob Storage, Entra header trust | implemented as IaC; hosted validation pending |
+| L3: production operations | migrations, CI/CD gates, readiness, metrics, logs, retry/recovery, backup and rollback runbooks, staging/production separation | implemented and locally tested where possible; cloud drills pending |
+| L4: architecture trade-offs | documented scale-out trigger, shared-rate-limit requirement, migration-job split, broker trigger, HA/cost decisions | discussion-ready, not scale-validated |
+
+The next cloud evidence milestone is narrow: deploy one immutable revision to a
+staging subscription, run migration status, authenticate, submit one idempotent
+job, verify its artifacts and metrics, roll back the image, and restore a small
+backup. That milestone upgrades claims; adding more cloud nouns does not.
+
+## 46. Capability Formation Chain
+
+Study and implementation follow dependencies, not a flat technology list:
+
+```text
+Python + SQL + HTTP fundamentals
+  -> independent implementation and debugging
+  -> hosted application and production operations
+  -> measured product evolution
+  -> final ownership consolidation
+  -> role-specific interview answers
+```
+
+### Python proof
+
+- Trace Pydantic validation into `POST /api/v1/jobs`.
+- Implement one repository query and its tests without AI-generated code.
+- Explain sync database handlers versus `async` worker coordination.
+- Classify exceptions into validation, persistence, external, ambiguous, and
+  retryable outcomes.
+- Package and run the same application through CLI, ASGI, and container entry
+  points.
+
+### API proof
+
+- Explain authentication, headers, input validation, pagination limits,
+  idempotency, `202 Accepted`, `409 Conflict`, `429`, and readiness `503`.
+- Write an `httpx` client with timeout, retry policy, backoff, JSON validation,
+  and rate-limit handling.
+- Defend why publishing transport has no blind retry while internal generation
+  jobs have bounded retry.
+- Verify OAuth state/PKCE, token handling, identity binding, and revocation.
+
+### SQL proof
+
+- Design primary keys, foreign keys, uniqueness, status constraints, and
+  indexes for runs, artifacts, publications, and workflow jobs.
+- Explain transactions, row locking, upsert/idempotency, migration ordering,
+  and SQLite/PostgreSQL differences.
+- Inspect an execution plan before adding an index.
+- Practice queries using BuildLog questions: latest successful publication per
+  platform, weekly approved artifacts, duplicate attempts, failure rates,
+  queue age, p95 latency inputs, and run-to-publication time.
+
+## 47. Forty-Five-Minute System-Design Method
+
+The local reference is *System Design Interview, Second Edition* by Alex Xu.
+Use its reusable interview shape, not memorized diagrams:
+
+1. Clarify functional requirements, exclusions, users, and success.
+2. Estimate users, requests, writes, object sizes, storage, bandwidth, latency,
+   retention, and growth with explicit assumptions.
+3. Define the smallest APIs, events, and data model.
+4. Draw one end-to-end high-level design.
+5. Deep-dive the hardest one or two paths.
+6. Test failures, consistency, durability, security, observability, cost, and
+   evolution against the original requirements.
+
+Time box: 5 minutes clarify, 5 estimate/contracts, 10 high level, 15 deep dive,
+5 failures/security, 5 trade-offs and recap. The goal is a coherent decision
+process, not naming every distributed-systems component.
+
+## 48. Case Transfer Map
+
+| Reference concept | Principle to learn | BuildLog or GTM transfer |
+|---|---|---|
+| Scale from one host | evolve architecture at measured thresholds | local SQLite to managed PostgreSQL; one worker before independent scaling |
+| Back-of-envelope estimation | make capacity assumptions visible | LLM jobs/day, tokens/job, artifact bytes, API read/write mix, cloud budget |
+| Rate limiter | policy, identity, counters, distributed coordination | current per-replica limiter; gateway/shared store before scale-out |
+| Consistent hashing | redistribute keys with limited movement | useful for partitioned caches/workers only after scale demands it |
+| Key-value store | partitioning, replication, consistency | idempotency/cache lookup design, not a reason to replace relational source of truth |
+| Distributed ID | uniqueness, ordering, availability | run/job/publication IDs and trace correlation across replicas |
+| URL shortener | API/data/cache fundamentals | clean practice case with little BuildLog coupling |
+| Web crawler | frontier, dedupe, politeness, freshness | authorized evidence/browser capture and CRM enrichment ingestion |
+| Notification system | preferences, fan-out, retry, provider outcomes | AI briefing delivery and publication receipt semantics |
+| News feed | fan-out, ranking, pagination | GTM activity feed and account-priority dashboard |
+| Chat | ordering, presence, delivery state | collaborative approval comments and live job status |
+| Autocomplete | prefix indexes, ranking, freshness | CRM account/contact lookup and evidence search |
+| Video platform | object storage, metadata, processing pipeline | generated visual/media artifacts and asynchronous transforms |
+| Cloud drive | metadata/payload separation, sync, versioning | SQL metadata plus filesystem/Blob artifacts and hashes |
+
+## 49. Salesforce AI GTM Design Cases
+
+Prepare these after the common system-design fundamentals:
+
+| Case | Required deep dive | Business outcome |
+|---|---|---|
+| Lead enrichment and routing | source precedence, dedupe, rate limits, confidence, human override | route qualified leads faster without corrupting CRM |
+| CRM source of truth | identity resolution, merge policy, audit history, permissions, reconciliation | improve data trust and pipeline reporting |
+| Daily account briefing agent | trigger, retrieval, grounding, token/cost budget, evaluation, delivery | reduce research time while preserving citations |
+| Marketing-to-sales diagnosis | event model, attribution windows, data quality, funnel queries, dashboard | explain why lead growth did not become revenue |
+| AI demo utility | safe tenant data, prompt/version control, latency fallback, observability | help solution engineers demonstrate repeatable value |
+| Multi-channel approval workflow | artifact lineage, reviewer state, idempotent delivery, ambiguous outcomes | increase content throughput without unauthorized posting |
+
+For every case, state the GTM metric, data owner, source of truth, human control,
+failure cost, and adoption plan before choosing AI components.
+
+## 50. GTM Engineer Role Fork
+
+`GTM Engineer` is not one standardized job. Prepare for two overlapping
+centers of gravity:
+
+| Role center | Typical work | Interview proof |
+|---|---|---|
+| RevOps / growth automation | enrichment, routing, campaigns, Clay-style workflows, CRM hygiene | connect an API, map fields, build a workflow, explain lifecycle and campaign logic |
+| AI-native product engineering | architect and ship internal applications for sales, marketing, or solutions teams | coding, APIs, SQL, full stack, cloud, AI evaluation, system design, product adoption |
+
+The Salesforce AI GTM Developer target belongs primarily to the second group,
+while using the first group's CRM and funnel language as the business domain.
+Do not assume one Reddit thread describes a fixed Salesforce interview loop.
+Prepare for a mixed process: screen, stakeholder/product discussion, coding or
+pipeline practical, system design, and a short presentation.
+
+The positioning sentence is:
+
+> I use AI coding tools to move faster, but I independently validate the
+> architecture, data flow, failure modes, security boundary, and business
+> outcome.
+
+## 51. Context Engineering for GTM
+
+Context engineering is the design of the complete, governed input available to
+a model at decision time. It is broader than prompt wording.
+
+```text
+CRM records + activity history + external signals + business rules
+  -> identity and tenant boundary
+  -> freshness and source-authority checks
+  -> conflict resolution and deterministic filters
+  -> retrieval, ranking, and token-budget compression
+  -> prompt and tool context with source attribution
+  -> structured model output
+  -> policy validation and human review
+  -> CRM action and audit record
+```
+
+Every context item should carry, where applicable:
+
+- `source_system` and stable source identifier;
+- account/contact/tenant ownership;
+- observed and last-updated timestamps;
+- authority or precedence level;
+- consent, sensitivity, and allowed-use policy;
+- confidence and extraction method;
+- citation or retrieval pointer;
+- expiration/freshness rule.
+
+Hard questions:
+
+1. Which system wins when Salesforce, enrichment data, and a rep's note
+   disagree?
+2. How is one customer's context prevented from entering another customer's
+   prompt, cache, trace, or evaluation set?
+3. Which fields are deterministic eligibility rules and must never be left to
+   model judgment?
+4. How are long histories summarized without losing disqualifying evidence or
+   attribution?
+5. How are prompt/context versions tied to the resulting recommendation and
+   later CRM mutation?
+6. How are quality, latency, token cost, override rate, and downstream
+   conversion measured separately?
+
+BuildLog transfers directly through evidence selection, provenance, prompt
+versions, structured output, human review, artifact lineage, and receipt
+semantics. The GTM system adds tenant isolation, CRM precedence, lifecycle
+rules, and customer-data policy.
+
+## 52. Salesforce and RevOps Working Model
+
+Know the minimum object graph before designing an agent:
+
+```text
+Lead --convert--> Account + Contact + optional Opportunity
+Account --owns--> Contacts and Opportunities
+Campaign <--membership--> Lead or Contact
+Task / Event --records activity against--> people, accounts, and opportunities
+Opportunity --moves through--> qualified sales stages toward closed outcome
+```
+
+Vocabulary to use correctly:
+
+| Area | Concepts |
+|---|---|
+| Identity | Lead versus Contact, Account, external ID, duplicate and merge |
+| Funnel | capture, MQL/SQL definitions, qualification, opportunity, won/lost |
+| Routing | territory, segment, account ownership, capacity, SLA, fallback |
+| Enrichment | source, confidence, freshness, field-level precedence, consent |
+| Campaign | membership, response, attribution window, influenced pipeline |
+| Handoff | marketing-to-sales state, owner, timestamp, acceptance and rejection reason |
+| Lifecycle | status transition, re-entry, recycle, suppression and deletion |
+
+Integration decisions to defend:
+
+- cursor or page-token pagination, incremental watermarks, and backfills;
+- OAuth scopes, secret rotation, rate limits, timeout, backoff, and replay;
+- external IDs and idempotent upserts instead of create-on-every-run;
+- field-level validation and dead-letter/reconciliation handling;
+- source-of-truth policy and append-only audit history;
+- bulk versus synchronous APIs and eventual consistency;
+- webhook signature verification, ordering, duplicate events, and missed-event
+  recovery;
+- least-privilege object/field access and sensitive-field exclusion from LLM
+  context.
+
+## 53. Three GTM Practical Labs
+
+These are independent implementation exercises, not new BuildLog features.
+Complete them after the Python/API/SQL foundation and before the final ownership
+consolidation.
+
+### Lab A: CRM mapping and idempotent sync
+
+Input: paginated customer/lead JSON from a mock SaaS API.
+
+Build:
+
+- typed source and Salesforce-style target contracts;
+- normalization for email, company/domain, dates, and missing values;
+- deterministic duplicate candidates with explainable match reasons;
+- field-level source precedence and conflict records;
+- external-ID upsert, retry/backoff, rate-limit handling, and dead-letter file;
+- SQL audit tables and reconciliation summary.
+
+Acceptance evidence: rerunning the same input creates no duplicate mutation;
+partial failure resumes from a checkpoint; tests cover malformed input,
+pagination, rate limits, conflicts, and ambiguous timeout.
+
+### Lab B: Lead qualification and routing workflow
+
+```text
+new lead
+  -> validate and deduplicate
+  -> enrich
+  -> deterministic eligibility
+  -> score with reason codes
+  -> route by territory/segment/capacity
+  -> create grounded outreach draft
+  -> human approval
+  -> idempotent CRM update and audit receipt
+```
+
+State explicitly which steps are deterministic and where an LLM is allowed.
+Measure routing accuracy, unassigned rate, SLA time, approval/override rate,
+model cost, and downstream conversion without claiming causation prematurely.
+
+### Lab C: Funnel diagnosis
+
+Case: traffic rose 40 percent while opportunities stayed flat.
+
+Investigate in order:
+
+1. event/tracking completeness and definition changes;
+2. lead-form capture and deduplication;
+3. source/campaign mix and qualification rate;
+4. routing failures, ownership gaps, and response-time SLA;
+5. CRM synchronization and stage-transition integrity;
+6. cohort conversion by source, segment, territory, and time window.
+
+Deliver SQL queries, a funnel table, a short causal-hypothesis tree, recommended
+instrumentation, and a five-slide executive readout. Do not begin with "add an
+agent" before locating the broken measurement or workflow boundary.
+
+## 54. Practical Interview and Presentation Rubric
+
+For a live build or take-home, score the solution on:
+
+| Dimension | Evidence |
+|---|---|
+| Problem framing | user, bottleneck, success metric, exclusions, assumptions |
+| Business logic | lifecycle rules, source of truth, deterministic versus LLM boundary |
+| Engineering | typed contracts, clear modules, tests, errors, idempotency, observability |
+| Data | schema, keys, dedupe, query quality, freshness, reconciliation |
+| AI | context contract, grounding, structured output, evaluation, human override |
+| Production | auth, secrets, rate limits, deployment, rollback, cost and failure modes |
+| Communication | demo path, architecture diagram, trade-offs, measured evidence, next step |
+
+Short presentation structure:
+
+1. Business problem and metric.
+2. Users, workflow, and current failure.
+3. Architecture and data flow.
+4. Demo plus test/measurement evidence.
+5. Trade-offs, risks, and next iteration.
+
+## 55. Ownership Notes During Development
+
+Add one note for every material module or incident:
+
+```text
+Date / change:
+User or business problem:
+Entry point and request flow:
+Data model and invariants:
+Failure modes and recovery:
+Security and privacy boundary:
+Observability and test evidence:
+Alternatives and trade-off:
+Measured result:
+What remains unverified:
+Independent change I can now make:
+```
+
+Do not rewrite the full handbook after every feature. Accumulate these notes,
+then perform final consolidation after the hosted deployment, database drills,
+and core workflows stabilize.
+
+---
+
+# Part XIII. Ownership Passes
+
+## 56. Definition of Done for Every Pass
 
 Mark a pass complete only when all are true:
 
@@ -1205,7 +1635,7 @@ Mark a pass complete only when all are true:
 - [ ] I can state one current limitation without becoming defensive.
 - [ ] I can make or describe one safe change.
 
-## 44. Twenty-Pass Study Plan
+## 57. Thirty-One-Pass Study Plan
 
 ### OP-01: Product Contract and Claims
 
@@ -1430,7 +1860,79 @@ Deliver:
 
 This pass turns explanation into demonstrated ownership.
 
-## 45. Progress Ledger
+### OP-21: Hosted API and UI
+
+Read: `web_app.py`, `web_models.py`, `web_security.py`, `web_static/`.
+
+Deliver: trace dashboard and job requests, explain auth and rate-limit trust
+boundaries, modify one endpoint and its frontend consumer, and test failures.
+
+### OP-22: Durable Jobs and Concurrency
+
+Read: `web_repository.py`, `web_worker.py`, `persistence_models.py`.
+
+Deliver: draw the state machine, explain idempotency and row locking, recover a
+stale job, and defend the broker migration trigger.
+
+### OP-23: SQL and Migrations
+
+Read: `migration.py`, `migrations/`, repository queries.
+
+Deliver: upgrade a fresh database, inspect current revision, write five GTM
+queries, examine one query plan, and describe expand-and-contract migration.
+
+### OP-24: Container and Azure Deployment
+
+Read: `Dockerfile`, `compose.yaml`, `infra/azure/`, deployment workflow.
+
+Deliver: explain every managed resource and secret flow, deploy staging, run a
+hosted smoke test, and record actual URL, revision, cost, and limits.
+
+### OP-25: Reliability and Incident Drill
+
+Deliver: exercise failed readiness, stale job recovery, provider timeout,
+artifact mirror failure, rollback, and database restore. Record detection,
+impact, mitigation, and prevention.
+
+### OP-26: Performance and Capacity
+
+Read: benchmark script and evidence JSON.
+
+Deliver: reproduce the ASGI baseline, add a network/container benchmark,
+estimate GTM workload capacity and cost, identify the first bottleneck, and
+state when one replica stops being acceptable.
+
+### OP-27: GTM Architecture Cases
+
+Deliver: complete 45-minute mocks for lead routing, CRM source of truth, and
+daily account briefing. Include business metric, SQL model, API contracts, AI
+evaluation, human override, and adoption plan.
+
+### OP-28: Context Engineering Transfer
+
+Deliver: design one account-briefing context contract with authority,
+freshness, tenant, policy, token-budget, citation, and evaluation fields. Test a
+source conflict, stale signal, oversized history, and cross-tenant rejection.
+
+### OP-29: CRM Data and Workflow Labs
+
+Deliver: complete Labs A and B with original Python/SQL code, tests, one failure
+recovery exercise, and a ten-minute walkthrough without AI assistance.
+
+### OP-30: GTM Diagnosis and Presentation
+
+Deliver: complete Lab C under a two-hour limit, then present the five-slide
+readout in ten minutes and answer stakeholder, architecture, and measurement
+trade-off questions.
+
+### OP-31: Final Ownership Consolidation
+
+After cloud validation, the independent change, and GTM labs, reconcile all
+Ownership Notes into this handbook, replace stale baseline claims, produce a
+60-minute project deep dive, and make one unfamiliar change without AI
+assistance.
+
+## 58. Progress Ledger
 
 | Pass | Status | Date | Weakest point / follow-up |
 |---|---|---|---|
@@ -1454,6 +1956,17 @@ This pass turns explanation into demonstrated ownership.
 | OP-18 Project mock | Not started | | |
 | OP-19 System design | Not started | | |
 | OP-20 Independent change | Not started | | |
+| OP-21 Hosted API/UI | Not started | | |
+| OP-22 Durable jobs | Not started | | |
+| OP-23 SQL/migrations | Not started | | |
+| OP-24 Azure deployment | In progress | 2026-08-02 | Implementation exists; hosted smoke and rollback remain |
+| OP-25 Incident drill | Not started | | |
+| OP-26 Performance/capacity | In progress | 2026-08-02 | ASGI read baseline exists; network/container/write mix remain |
+| OP-27 GTM cases | Not started | | |
+| OP-28 Context engineering | Not started | | |
+| OP-29 CRM workflow labs | Not started | | |
+| OP-30 GTM diagnosis/presentation | Not started | | |
+| OP-31 Final consolidation | Not started | | |
 
 ---
 

@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from buildlog.config import load_settings
 from buildlog.llm_client import LLMClient
 from buildlog.pipeline import run_pipeline
@@ -221,6 +223,41 @@ def test_no_revision_records_draft_as_final_source(
     assert final_sources == [f"{result.run_dir.name}:draft"]
     assert observation is not None
     assert observation.revision_improvement_status.value == "not_applicable"
+
+
+def test_failed_run_persists_only_a_sanitized_error(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    input_path = tmp_path / "iteration.json"
+    fixture = Path(__file__).parent / "fixtures" / "valid_iteration.json"
+    input_path.write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
+    settings = load_settings(Path.cwd())
+    settings = settings.__class__(
+        **{
+            **settings.__dict__,
+            "runs_dir": tmp_path / "runs",
+            "database_url": f"sqlite:///{tmp_path / 'buildlog.db'}",
+        }
+    )
+    repository = SQLAlchemyRunRepository(settings.database_url)
+    repository.initialize()
+
+    def fail_with_secret(_self, _prompt):
+        raise RuntimeError("api_key=do-not-persist /Users/private/project")
+
+    monkeypatch.setattr(LLMClient, "_completion", fail_with_secret)
+
+    with pytest.raises(RuntimeError, match="do-not-persist"):
+        run_pipeline(input_path, settings, repository)
+
+    run_dir = next(path for path in (tmp_path / "runs").iterdir() if path.is_dir())
+    stored = repository.get_run(run_dir.name)
+    assert stored is not None
+    assert stored.status == "failed"
+    assert "do-not-persist" not in (stored.error_message or "")
+    assert "/Users/" not in (stored.error_message or "")
+    assert "<redacted>" in (stored.error_message or "")
 
 
 def _response(content: str, prompt_tokens: int, completion_tokens: int) -> object:

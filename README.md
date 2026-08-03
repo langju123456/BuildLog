@@ -24,9 +24,10 @@ story with weak grounding.
 
 ## 🧩 Product Capabilities
 
-BuildLog is an evidence-to-artifact AI engineering workflow. In v0.2, it
-combines reviewed technical content, a local LinkedIn-targeted Publishing
-Package, and optional human-controlled text delivery to LinkedIn and X.
+BuildLog is an evidence-to-artifact internal AI product. It combines a hosted
+operations surface, a durable generation workflow, reviewed technical content,
+a LinkedIn-targeted Publishing Package, and optional human-controlled text
+delivery to LinkedIn and X.
 
 Its current business capabilities are:
 
@@ -46,6 +47,15 @@ Its current business capabilities are:
 - **Replayable engineering workflow:** preserves enough metadata to rerun the
   same engineering iteration under the same prompts, model configuration, and
   code state as far as practical.
+- **Full-stack operations surface:** exposes an authenticated FastAPI API and
+  responsive JavaScript dashboard for run metrics, run inspection, workflow
+  intake, and durable job status.
+- **Durable workflow execution:** validates API input, enforces idempotency,
+  claims jobs transactionally, bounds retries, recovers stale work, and keeps
+  the existing LLM pipeline behind a replaceable worker boundary.
+- **Cloud delivery path:** packages the service as a non-root container and
+  defines Azure Container Apps, managed PostgreSQL, Blob Storage, managed
+  identity, health probes, migrations, CI/CD, backup, and rollback controls.
 - **Human-controlled social publishing:** authenticates one local account,
   previews the exact final artifact, blocks duplicate posts, requires explicit
   approval, and stores a safe publication receipt. LinkedIn and X have both
@@ -116,11 +126,13 @@ flowchart LR
     E -->|"No"| G["Final draft"]
     E -->|"Yes"| F["One constrained revision"]
     F --> G
-    G --> H["Human review"]
-    H --> I["Publishing artifact or package"]
-    I --> J{"Delivery choice"}
-    J -->|"Manual"| K["Copy or upload"]
-    J -->|"Approved adapter"| L["LinkedIn or X transport"]
+    G --> H["Durable run and artifact store"]
+    H --> I["Operations dashboard"]
+    I --> J["Human review"]
+    J --> K["Publishing artifact or package"]
+    K --> L{"Delivery choice"}
+    L -->|"Manual"| M["Copy or upload"]
+    L -->|"Approved adapter"| N["LinkedIn or X transport"]
 ```
 
 Deterministic code handles validation, normalization, thresholds, persistence,
@@ -164,6 +176,15 @@ Currently included:
 - Local LinkedIn-targeted publishing packages built from reviewed runs
 - Validated, grounded card specifications and deterministic 1080x1350 PNGs
 - A package manifest with source, prompt, model, caption, and asset hashes
+- Authenticated FastAPI API and browser operations dashboard
+- Idempotent, durable database-backed workflow jobs with bounded retry and
+  stale-job recovery
+- Alembic schema migrations for SQLite and PostgreSQL
+- Request IDs, health/readiness probes, structured logs, Prometheus request
+  metrics, API-key/Entra-aware authentication, and per-replica rate limiting
+- Non-root Docker image, local Compose configuration, Azure Container Apps
+  Bicep, and protected staging/production GitHub Actions workflows
+- Optional Azure Blob mirroring with SHA-256 object metadata
 
 Not included:
 
@@ -173,7 +194,9 @@ Not included:
 - X media upload, threads, replies, scheduling, analytics, or deletion
 - Image-generation APIs, dynamic template systems, or multi-platform packages
 - Automatic GitHub, commit, issue, or diff collection
-- Web UI, API, accounts, or cloud deployment
+- Public signup, user management, or application-owned role-based access
+- A completed hosted Azure smoke test or measured production traffic
+- Multi-replica migration coordination or globally shared rate limiting
 - RAG, vector search, or long-term memory
 - Resume, ADR, weekly-report, or PR-description generation
 - A guarantee that generated text is publishable without human editing
@@ -193,7 +216,10 @@ must improve the product while proving a concrete engineering capability.
 | AI evaluation | Demonstrated through automated scoring, human-style review, and cross-case baselines |
 | Observability | Demonstrated through run metadata, timeline, events, LLM-call records, and artifact lineage |
 | Reproducibility | Demonstrated through prompt hashes, artifact hashes, model config, Git state, and replay metadata |
-| Backend engineering | Demonstrated through Python, Pydantic, SQLAlchemy, SQLite, repository boundaries, CLI, and tests |
+| Full-stack engineering | Demonstrated through Python, FastAPI, JavaScript, Pydantic, SQLAlchemy, REST contracts, an operations dashboard, and tests |
+| Database engineering | Demonstrated through SQLite/PostgreSQL-compatible repositories, Alembic migrations, idempotency constraints, transactional job claims, and indexes |
+| Cloud and delivery | Implemented through Docker, Azure Container Apps Bicep, managed PostgreSQL, Blob Storage, managed identity, GitHub Actions, health probes, and runbooks; hosted smoke validation remains pending |
+| Production reliability | Demonstrated locally through durable jobs, bounded retries, stale-work recovery, request IDs, Prometheus metrics, readiness checks, rate limiting, and artifact hashes |
 | Product thinking | Demonstrated through explicit v0.1 scope, non-goals, evaluation baselines, and public showcase assets |
 | Tool calling | Planned |
 | Evidence collection | Planned |
@@ -201,7 +227,7 @@ must improve the product while proving a concrete engineering capability.
 | Retrieval and memory | Planned |
 | Multimodal communication | Planned |
 | Human-controlled delivery | Demonstrated through real LinkedIn and X OAuth, identity, preview, approval, duplicate protection, and receipts |
-| Workflow automation | Planned |
+| Workflow automation | Demonstrated through API-submitted durable generation jobs and a bounded worker |
 
 ## See a Real Example
 
@@ -251,6 +277,30 @@ artifacts are written under `runs/`; structured metadata is stored in
 Use `BUILDLOG_MODEL_DIGEST` when an immutable local model digest is available.
 Without it, generation still works, but BuildLog honestly marks the replay
 manifest as partial.
+
+## Run the Internal Product
+
+Install the hosted-product dependencies, apply the schema, and start the API:
+
+```bash
+.venv/bin/pip install -e '.[dev,web,cloud]'
+BUILDLOG_DATABASE_URL=sqlite:///buildlog.db .venv/bin/buildlog database upgrade
+BUILDLOG_WEB_API_KEY='replace-with-at-least-24-random-characters' \
+  .venv/bin/buildlog web --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`, connect with the API key, inspect run evidence,
+or submit a validated iteration. Each `POST /api/v1/jobs` requires an
+`Idempotency-Key`; the worker records completion, bounded failure, and retry
+state in the database.
+
+The same application can run with Docker Compose or the Azure reference
+deployment. See [Azure deployment](infra/azure/README.md), the [operations
+runbook](infra/azure/OPERATIONS.md), and the [recorded benchmark
+scope](docs/benchmarks/web_asgi_baseline.json). The committed 500-request
+baseline had zero request errors and 34.56 ms p95 latency in an in-process ASGI
+read test. It intentionally excludes network and container overhead and is not
+presented as production traffic.
 
 ## Build a Publishing Package
 
@@ -348,6 +398,10 @@ live publishing use OAuth 2.0 PKCE with a local callback; see the
   architecture and safety decisions
 - [X Publisher Phase Review](docs/x/phase-review.md): verified capability,
   limits, and the decision to freeze delivery expansion
+- [Ownership Handbook](docs/BUILDLOG_OWNERSHIP_HANDBOOK.md): code ownership,
+  production operations, system-design transfer, and interview study passes
+- [Hosted Product Evidence](docs/benchmarks/product_evidence_2026-08-02.json):
+  point-in-time test, workflow, publication, and benchmark evidence
 
 BuildLog is not a LinkedIn generator with extra logging. It is a small,
 inspectable AI engineering workflow for turning real development evidence into

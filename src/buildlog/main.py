@@ -25,6 +25,14 @@ def main(argv: list[str] | None = None) -> int:
         return package_main(command_args[1:])
     if command_args and command_args[0] == "x":
         return x_main(command_args[1:])
+    if command_args and command_args[0] == "web":
+        from buildlog.web_cli import web_main
+
+        return web_main(command_args[1:])
+    if command_args and command_args[0] == "database":
+        from buildlog.database_cli import database_main
+
+        return database_main(command_args[1:])
 
     parser = argparse.ArgumentParser(
         description="Generate a LinkedIn draft from one iteration JSON file.",
@@ -32,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
             "LinkedIn authentication and publishing: "
             "buildlog linkedin --help. Local publishing packages: "
             "buildlog package --help. X authentication and publishing: "
-            "buildlog x --help"
+            "buildlog x --help. Hosted internal product: buildlog web --help"
         ),
     )
     parser.add_argument("input_path", type=Path)

@@ -6,6 +6,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -45,7 +46,7 @@ def create_run_trace(runs_dir: Path, iteration_id: str) -> RunTrace:
     """Create and return a unique run trace directory."""
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
     safe_id = "".join(char if char.isalnum() or char in "-_" else "-" for char in iteration_id)
-    run_dir = runs_dir / f"{timestamp}_{safe_id}"
+    run_dir = runs_dir / f"{timestamp}_{safe_id}_{uuid4().hex[:8]}"
     counter = 1
     while run_dir.exists():
         run_dir = runs_dir / f"{timestamp}_{safe_id}_{counter}"
