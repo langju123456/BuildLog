@@ -25,6 +25,9 @@ buildlog = "buildlog.main:main"
 dev = [
   "pytest>=8.0",
 ]
+canvas = [
+  "playwright>=1.45,<2.0",
+]
 web = [
   "fastapi>=0.116,<1.0",
   "prometheus-client>=0.22,<1.0",

@@ -13,3 +13,6 @@ buildlog.db
 *.db-wal
 runs/*
 !runs/.gitkeep
+.canvas_playwright_profile/
+canvas_raw_captures/
+course_archive/
