@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from buildlog.config import load_settings
 from buildlog.exceptions import ModelResponseError, StructuredOutputError
@@ -195,7 +196,8 @@ def test_schema_failure_is_captured_without_changing_validation(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    invalid = {**VALID_EVALUATION, "technical_accuracy": "excellent"}
+    sensitive_marker = "SENSITIVE-SCHEMA-MARKER-DO-NOT-LEAK"
+    invalid = {**VALID_EVALUATION, "technical_accuracy": sensitive_marker}
     raw = json.dumps(invalid)
     client, observer, run_dir = _client(
         tmp_path,
@@ -204,13 +206,58 @@ def test_schema_failure_is_captured_without_changing_validation(
         capture=True,
     )
 
-    with pytest.raises(StructuredOutputError):
+    with pytest.raises(StructuredOutputError) as error:
+        with observer.step("evaluator"):
+            client.complete_json("evaluate", Evaluation)
+    observer.fail_pipeline(error.value)
+
+    response = run_dir / "debug" / "failed_evaluator_response.txt"
+    events = (run_dir / "events.jsonl").read_text(encoding="utf-8")
+    run_metadata = json.dumps(observer.run_metadata_payload())
+
+    assert response.read_text(encoding="utf-8") == raw
+    assert str(error.value) == (
+        "model returned schema-invalid structured output"
+    )
+    assert isinstance(error.value.__cause__, ValidationError)
+    assert sensitive_marker not in str(error.value)
+    assert sensitive_marker not in events
+    assert sensitive_marker not in run_metadata
+    assert observer.errors[0].error_code == "llm_schema_invalid"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symlink semantics")
+def test_symlinked_debug_directory_cannot_escape_run_directory(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    sensitive_marker = "SENSITIVE-SYMLINK-MARKER-DO-NOT-WRITE"
+    client, observer, run_dir = _client(
+        tmp_path,
+        monkeypatch,
+        sensitive_marker,
+        capture=True,
+    )
+    external_directory = tmp_path / "external"
+    external_directory.mkdir(mode=0o755)
+    external_mode = stat.S_IMODE(external_directory.stat().st_mode)
+    (run_dir / "debug").symlink_to(
+        external_directory,
+        target_is_directory=True,
+    )
+
+    with pytest.raises(StructuredOutputError, match="invalid JSON") as error:
         with observer.step("evaluator"):
             client.complete_json("evaluate", Evaluation)
 
-    assert (
-        run_dir / "debug" / "failed_evaluator_response.txt"
-    ).read_text(encoding="utf-8") == raw
+    assert list(external_directory.iterdir()) == []
+    assert stat.S_IMODE(external_directory.stat().st_mode) == external_mode
+    assert str(error.value).startswith("model returned invalid JSON")
+    assert observer.observability_status.value == "partial"
+    assert len(observer.observability_issues) == 1
+    assert observer.observability_issues[0].startswith(
+        "could not capture failed structured output:"
+    )
 
 
 def test_capture_is_utf8_bounded_and_records_full_hash(tmp_path: Path) -> None:

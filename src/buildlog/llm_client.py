@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from time import perf_counter_ns
-from typing import Any, Callable, TypeVar
+from typing import Callable, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -136,12 +136,16 @@ def _parse_json_response(response: object, schema: type[SchemaT]) -> SchemaT:
     try:
         data = json.loads(_strip_json_fence(raw))
     except json.JSONDecodeError as exc:
-        raise StructuredOutputError(f"model returned invalid JSON: {exc.msg}") from exc
+        raise StructuredOutputError(
+            f"model returned invalid JSON: {exc.msg}"
+        ) from exc
 
     try:
         return schema.model_validate(data)
     except ValidationError as exc:
-        raise StructuredOutputError(str(exc)) from exc
+        raise StructuredOutputError(
+            "model returned schema-invalid structured output"
+        ) from exc
 
 
 def _start_observation(
@@ -204,7 +208,9 @@ def _extract_usage(response: object) -> dict[str, int | None] | None:
         return None
     return {
         "prompt_tokens": _optional_int(_read_value(usage, "prompt_tokens")),
-        "completion_tokens": _optional_int(_read_value(usage, "completion_tokens")),
+        "completion_tokens": _optional_int(
+            _read_value(usage, "completion_tokens")
+        ),
         "total_tokens": _optional_int(_read_value(usage, "total_tokens")),
     }
 
@@ -239,9 +245,13 @@ def _extract_content(response: object) -> str:
         message = _read_value(choices[0], "message")
         content = _read_value(message, "content")
     except (IndexError, TypeError) as exc:
-        raise ModelResponseError("model response did not contain message content") from exc
+        raise ModelResponseError(
+            "model response did not contain message content"
+        ) from exc
     if content is None:
-        raise ModelResponseError("model response did not contain message content")
+        raise ModelResponseError(
+            "model response did not contain message content"
+        )
     return str(content)
 
 

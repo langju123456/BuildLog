@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -38,10 +39,6 @@ def capture_failed_structured_output(
     captured_text = raw_bytes[:max_bytes].decode("utf-8", errors="ignore")
     captured_bytes = captured_text.encode("utf-8")
     debug_dir = run_dir / "debug"
-    debug_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if os.name == "posix":
-        debug_dir.chmod(0o700)
-
     response_path = debug_dir / f"failed_{step_name}_response.txt"
     metadata_path = debug_dir / f"failed_{step_name}_response.json"
     metadata = {
@@ -60,14 +57,80 @@ def capture_failed_structured_output(
         "response_file": response_path.name,
     }
 
-    _write_private_file(response_path, captured_bytes)
-    _write_private_file(
-        metadata_path,
-        (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode(
-            "utf-8"
-        ),
-    )
+    metadata_bytes = (
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    if os.name == "posix":
+        _write_private_posix_diagnostics(
+            run_dir,
+            (
+                (response_path.name, captured_bytes),
+                (metadata_path.name, metadata_bytes),
+            ),
+        )
+    else:
+        debug_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _write_private_file(response_path, captured_bytes)
+        _write_private_file(metadata_path, metadata_bytes)
     return FailedStructuredOutputCapture(response_path, metadata_path)
+
+
+def _write_private_posix_diagnostics(
+    run_dir: Path,
+    files: tuple[tuple[str, bytes], ...],
+) -> None:
+    required = ("O_DIRECTORY", "O_NOFOLLOW", "fchmod")
+    if any(not hasattr(os, name) for name in required):
+        raise OSError("secure diagnostic directory operations are unavailable")
+    if os.open not in os.supports_dir_fd or os.mkdir not in os.supports_dir_fd:
+        raise OSError("descriptor-relative diagnostics are unavailable")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+
+    run_descriptor = os.open(run_dir, directory_flags)
+    try:
+        try:
+            os.mkdir("debug", mode=0o700, dir_fd=run_descriptor)
+        except FileExistsError:
+            pass
+        debug_descriptor = os.open(
+            "debug",
+            directory_flags,
+            dir_fd=run_descriptor,
+        )
+        try:
+            if not stat.S_ISDIR(os.fstat(debug_descriptor).st_mode):
+                raise NotADirectoryError("diagnostic path is not a directory")
+            os.fchmod(debug_descriptor, 0o700)
+            for filename, content in files:
+                _write_private_file_at(
+                    debug_descriptor,
+                    filename,
+                    content,
+                )
+        finally:
+            os.close(debug_descriptor)
+    finally:
+        os.close(run_descriptor)
+
+
+def _write_private_file_at(
+    directory_descriptor: int,
+    filename: str,
+    content: bytes,
+) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    descriptor = os.open(
+        filename,
+        flags,
+        0o600,
+        dir_fd=directory_descriptor,
+    )
+    _write_open_descriptor(descriptor, content, set_private_mode=True)
 
 
 def _write_private_file(path: Path, content: bytes) -> None:
@@ -75,7 +138,18 @@ def _write_private_file(path: Path, content: bytes) -> None:
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)
+    _write_open_descriptor(descriptor, content, set_private_mode=False)
+
+
+def _write_open_descriptor(
+    descriptor: int,
+    content: bytes,
+    *,
+    set_private_mode: bool,
+) -> None:
     try:
+        if set_private_mode:
+            os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "wb") as file_handle:
             file_handle.write(content)
     except Exception:
@@ -84,5 +158,3 @@ def _write_private_file(path: Path, content: bytes) -> None:
         except OSError:
             pass
         raise
-    if os.name == "posix":
-        path.chmod(0o600)
