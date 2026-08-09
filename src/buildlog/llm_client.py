@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from buildlog.config import Settings
 from buildlog.exceptions import ModelResponseError, StructuredOutputError
 from buildlog.observer import ActiveStep, PendingLLMCall, get_active_step
+from buildlog.structured_diagnostics import capture_failed_structured_output
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 ResultT = TypeVar("ResultT")
@@ -29,10 +30,40 @@ class LLMClient:
 
     def complete_json(self, prompt: str, schema: type[SchemaT]) -> SchemaT:
         """Return a Pydantic-validated JSON model completion."""
+
+        def parse(response: object) -> SchemaT:
+            try:
+                return _parse_json_response(response, schema)
+            except StructuredOutputError:
+                self._capture_failed_structured_output(response)
+                raise
+
         return self._observed_completion(
             prompt,
-            lambda response: _parse_json_response(response, schema),
+            parse,
         )
+
+    def _capture_failed_structured_output(self, response: object) -> None:
+        if (
+            not self._settings.capture_failed_structured_output
+            or self._settings.environment != "development"
+        ):
+            return
+        active = get_active_step()
+        if active is None:
+            return
+        try:
+            content = _extract_content(response)
+            capture_failed_structured_output(
+                active.observer.run_dir,
+                active.step_name,
+                content,
+            )
+        except Exception as exc:
+            active.observer.record_observability_issue(
+                "could not capture failed structured output: "
+                f"{type(exc).__name__}"
+            )
 
     def _observed_completion(
         self,
