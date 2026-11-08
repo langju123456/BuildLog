@@ -1,6 +1,6 @@
 # BuildLog — Project Specification
 
-> This file is the primary product and engineering context for humans and coding agents working on BuildLog.
+> This file is the primary product and engineering context for BuildLog.
 
 ---
 
@@ -1538,7 +1538,7 @@ The reviser must:
 
 ## 18. Coding standards
 
-All coding agents must follow these rules.
+All code must follow these rules.
 
 ### Architecture
 
