@@ -59,7 +59,11 @@ Its current business capabilities are:
 - **Human-controlled social publishing:** authenticates one local account,
   previews the exact final artifact, blocks duplicate posts, requires explicit
   approval, and stores a safe publication receipt. LinkedIn and X have both
-  completed real OAuth, identity, and controlled text-publication validation.
+  completed real OAuth, identity, and controlled text-publication validation:
+  each ran one explicitly approved text post that returned HTTP 201 and left a
+  local receipt (LinkedIn on 2026-07-29, X on 2026-07-30; see
+  [LinkedIn publishing](docs/research/linkedin-publishing.md) and
+  [X setup](docs/x/setup.md)).
 - **Reviewable publishing packages:** turns one reviewed run into a local
   LinkedIn-ready caption, grounded card plan, deterministic PNG cards, alt
   text, and a versioned manifest without publishing them.
